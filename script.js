@@ -46,6 +46,7 @@ const screens = {
 };
 
 const scoreValueEl = document.getElementById("score-value");
+const jumpBonusValueEl = document.getElementById("jump-bonus-value");
 const bestScoreDisplayEl = document.getElementById("best-score-display");
 const modalTopScoreEl = document.getElementById("modal-top-score");
 const modalBestDistEl = document.getElementById("modal-best-dist");
@@ -115,12 +116,20 @@ function checkCollision(rectA, rectB, padding = 0) {
 // ========================================
 
 let lastDisplayedScore = null;
+let lastDisplayedJumpBonus = null;
 
 function setScore(value) {
     score = value;
     if (score !== lastDisplayedScore) {
         scoreValueEl.innerText = `${score}m`;
         lastDisplayedScore = score;
+    }
+}
+
+function updateJumpBonusUI(bonusValue) {
+    if (bonusValue !== lastDisplayedJumpBonus) {
+        jumpBonusValueEl.innerText = `${bonusValue}m`;
+        lastDisplayedJumpBonus = bonusValue;
     }
 }
 
@@ -534,6 +543,9 @@ let completedBigJumps = 0;
 let lastLandingDistance = 0;
 let nextRampTargetDistance = 1000;
 
+// 障害物出現間隔のランダム制御用タイマー
+let spawnIntervalThreshold = 350;
+
 const PLAYER_X = 200;
 const player = {
     slopeX: PLAYER_X,
@@ -582,6 +594,7 @@ function resetGame() {
     obstacles = [];
     particles = [];
     spawnTimer = 0;
+    spawnIntervalThreshold = 350;
     
     completedBigJumps = 0;
     lastLandingDistance = 0;
@@ -601,6 +614,7 @@ function resetGame() {
     player.fallY = 0;
 
     setScore(0);
+    updateJumpBonusUI(0);
 }
 
 function updateSpawns() {
@@ -608,20 +622,20 @@ function updateSpawns() {
 
     spawnTimer += speed;
 
-    // 正確に 1000m, 2000m, 3000m... ごとのジャンプ台生成チェック
+    // 1000mごとのジャンプ台（Ramp）生成
     if (distance >= nextRampTargetDistance) {
         const spawnDist = 1100;
         obstacles.push({ type: "ramp", dist: spawnDist, w: 100, h: 45, triggered: false });
-        nextRampTargetDistance = 99999999; // 出現済みとして一時的にロック
-        spawnTimer = -200;
+        nextRampTargetDistance = 99999999; // 出現済みロック（画面外消滅時または着地時に解除）
+        spawnTimer = -250;
         return;
     }
 
-    const minSpawnInterval = 420;
-    const randomExtraInterval = 180;
-
-    if (spawnTimer > minSpawnInterval + Math.random() * randomExtraInterval) {
+    // ランダムな間隔（180〜520の可変幅）でバラバラに障害物を出現させる
+    if (spawnTimer > spawnIntervalThreshold) {
         spawnTimer = 0;
+        spawnIntervalThreshold = Math.floor(180 + Math.random() * 340);
+
         const spawnDist = 1100;
 
         const canHole = distance >= 500;
@@ -632,7 +646,7 @@ function updateSpawns() {
 
         let candidates = ["snowman"];
 
-        if (distance >= 500 && Math.random() < 0.3) candidates.push("snowman_multi");
+        if (distance >= 500 && Math.random() < 0.35) candidates.push("snowman_multi");
         if (canHole) candidates.push("hole");
         if (canTreeNormal) candidates.push("tree_normal");
         if (canSkier) candidates.push("skier");
@@ -687,6 +701,7 @@ function update(dtMs) {
     if (state === STATE.PLAYING || state === STATE.BIG_JUMPING) {
         distance += speed * 0.12;
         setScore(Math.floor(distance));
+        updateJumpBonusUI(totalJumpDistance + (state === STATE.BIG_JUMPING ? lastJumpDist : 0));
 
         updateSpawns();
 
@@ -752,7 +767,12 @@ function update(dtMs) {
                 }
             }
 
+            // 画面左端へ画面外消滅した場合の処理
             if (obs.dist < -200 || (obs.falling && obs.fallY > GAME_HEIGHT)) {
+                // ジャンプ台を飛び越えるなどスルーした場合、次の区切り（1000m毎）を自動設定
+                if (obs.type === "ramp") {
+                    nextRampTargetDistance = Math.ceil((distance + 800) / 1000) * 1000;
+                }
                 obstacles.splice(i, 1);
             }
         }
@@ -831,8 +851,8 @@ function update(dtMs) {
             completedBigJumps++;
             lastLandingDistance = distance;
             
-            // 次の目標距離（1000m単位の次区切り）を再設定
-            nextRampTargetDistance = (completedBigJumps + 1) * 1000;
+            // 着地成功時：次の1000m区切りを更新
+            nextRampTargetDistance = Math.ceil((distance + 800) / 1000) * 1000;
 
             feedbackText = `BIG JUMP #${jumpHistory.length}: +${lastJumpDist}m!`;
             feedbackTimer = 60;
@@ -852,14 +872,6 @@ function updateParticles() {
         p.life -= 0.03;
         if (p.life <= 0) particles.splice(i, 1);
     }
-}
-
-function getStageName(dist) {
-    if (dist < 500) return "Snowman Zone";
-    if (dist < 1000) return "Cliff Abyss Zone";
-    if (dist < 2000) return "Pine Tree Zone";
-    if (dist < 3000) return "Crowded Slope Zone";
-    return "Giant Forest Zone";
 }
 
 
@@ -1116,7 +1128,7 @@ function render() {
 
     ctx.restore();
 
-    // プレイ中内テキスト (大ジャンプ演出 / ステージ・ボーナス表示)
+    // プレイ中テキスト (大ジャンプ中の操作案内・フィードバックテキストのみ)
     if (state === STATE.PLAYING || state === STATE.BIG_JUMPING) {
         if (state === STATE.BIG_JUMPING) {
             ctx.fillStyle = "#ff6d00";
@@ -1128,17 +1140,6 @@ function render() {
             ctx.font = "bold 16px sans-serif";
             ctx.fillText(`Air Bonus: +${lastJumpDist}m`, px, py - 30);
         }
-
-        const uiRightX = GAME_WIDTH - 25;
-        ctx.textAlign = "right";
-
-        ctx.fillStyle = "#0d47a1";
-        ctx.font = "bold 18px sans-serif";
-        ctx.fillText(`Jump Bonus: ${totalJumpDistance + (state === STATE.BIG_JUMPING ? lastJumpDist : 0)}m`, uiRightX, 35);
-
-        ctx.fillStyle = "#1565c0";
-        ctx.font = "bold 15px sans-serif";
-        ctx.fillText(`STAGE: ${getStageName(distance)}`, uiRightX, 60);
 
         if (feedbackTimer > 0) {
             ctx.fillStyle = "#ff6f00";

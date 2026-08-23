@@ -27,10 +27,16 @@
 
                 <!-- プレイ中HUD（スコア・ポーズボタン） -->
                 <div id="hud" class="hud">
-                    <!-- 左下：距離（DISTANCE）表示 -->
+                    <!-- 左下：距離（DISTANCE）＆ ジャンプボーナス表示 -->
                     <div class="hud-score-left">
-                        <span class="hud-score-label">DISTANCE</span>
-                        <span id="score-value" class="hud-score-value">0m</span>
+                        <div class="score-item">
+                            <span class="hud-score-label">DISTANCE</span>
+                            <span id="score-value" class="hud-score-value">0m</span>
+                        </div>
+                        <div class="score-item">
+                            <span class="hud-score-label">JUMP BONUS</span>
+                            <span id="jump-bonus-value" class="hud-score-value val-green-text">0m</span>
+                        </div>
                     </div>
 
                     <!-- 右上：ポーズボタン -->
@@ -98,7 +104,6 @@
                             </div>
                         </div>
 
-                        <!-- ボタン2個を横並びにして縦長化を防止 -->
                         <div class="button-row">
                             <button id="btn-retry" class="btn-game btn-game-primary">PLAY AGAIN 🔄</button>
                             <button id="btn-gameover-home" class="btn-game btn-game-secondary">TITLE 🏠</button>

@@ -115,21 +115,26 @@ button {
     z-index: 10;
 }
 
-/* 左下：距離表示 */
+/* 左下：距離＆ジャンプボーナス表示 */
 .hud-score-left {
     position: absolute;
     left: 14px;
     bottom: 14px;
     display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1px;
-    padding: 6px 12px;
-    background: rgba(9, 12, 22, 0.7);
+    gap: 12px;
+    padding: 6px 14px;
+    background: rgba(9, 12, 22, 0.75);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
     backdrop-filter: blur(4px);
     pointer-events: auto;
+}
+
+.score-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
 }
 
 .hud-score-label {
@@ -145,6 +150,10 @@ button {
     color: var(--color-gold);
     line-height: 1;
     font-variant-numeric: tabular-nums;
+}
+
+.val-green-text {
+    color: #00e676;
 }
 
 /* 右上：ポーズボタン */
@@ -347,7 +356,6 @@ button {
 .val-green { color: #00e676; font-weight: 700; }
 .val-gold { color: var(--color-gold); font-weight: 800; }
 
-/* 横並びボタンコンテナ */
 .button-row {
     display: flex;
     gap: 6px;
