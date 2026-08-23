@@ -106,7 +106,6 @@ function checkCollision(rectA, rectB, padding = 0) {
         rectA.x + padding < rectB.x + rectB.width - padding &&
         rectA.x + rectA.width - padding > rectB.x + padding &&
         rectA.y + padding < rectB.y + rectB.height - padding &&
-        rectA.y + padding < rectB.y + rectB.height - padding &&
         rectA.y + rectA.height - padding > rectB.y + padding
     );
 }
@@ -136,7 +135,7 @@ function updateJumpBonusUI(bonusValue) {
 
 
 // ========================================
-// 6. SoundFX (Web Audio API - 連打軽量化)
+// 6. SoundFX (Web Audio API)
 // ========================================
 
 class SoundFX {
@@ -558,7 +557,7 @@ let lastLandingDistance = 0;
 let nextRampTargetDistance = 1000;
 
 // 障害物出現の動的難易度調整用タイマー
-let spawnIntervalThreshold = 1600;
+let spawnIntervalThreshold = 300;
 
 const PLAYER_X = 200;
 const player = {
@@ -616,9 +615,9 @@ function resetGame() {
     obstacles = [];
     particles = [];
     
-    // ゲーム開始直後はしばらく敵を出さない(約200m無敵区間)
-    spawnTimer = -400; 
-    spawnIntervalThreshold = 1600; // 0m時点は200mに1回前後のゆったりペース
+    // ゲーム開始直後は少し安全区間を置く
+    spawnTimer = -200; 
+    spawnIntervalThreshold = 300; 
     
     completedBigJumps = 0;
     lastLandingDistance = 0;
@@ -657,35 +656,36 @@ function updateSpawns() {
         return;
     }
 
-    // 0m〜約200m毎からスタートし、走行距離に応じて密度を調整
+    // 走行距離に応じた頻度・ランダムゆらぎの生成（徐々に高密度＆ランダム波）
     if (spawnTimer > spawnIntervalThreshold) {
         spawnTimer = 0;
 
-        if (distance < 500) {
-            // 超初級：約200m間隔 (1500〜1800)
-            spawnIntervalThreshold = Math.floor(1500 + Math.random() * 300);
-        } else if (distance < 1200) {
-            // 初級：約150m間隔 (1100〜1400)
-            spawnIntervalThreshold = Math.floor(1100 + Math.random() * 300);
-        } else if (distance < 2500) {
-            // 中級：約100m間隔 (700〜1000)
-            spawnIntervalThreshold = Math.floor(700 + Math.random() * 300);
+        // 距離が伸びるほど間隔が狭まり、ランダムな疎密の波をつける
+        if (distance < 300) {
+            // 序盤：間隔 40m〜70m 相当 (しきい値 320〜550)
+            spawnIntervalThreshold = Math.floor(320 + Math.random() * 230);
+        } else if (distance < 800) {
+            // 初級：間隔 25m〜50m 相当 (しきい値 200〜400)
+            spawnIntervalThreshold = Math.floor(200 + Math.random() * 200);
+        } else if (distance < 1800) {
+            // 中級：間隔 15m〜35m 相当 (しきい値 120〜280)
+            spawnIntervalThreshold = Math.floor(120 + Math.random() * 160);
         } else {
-            // 上級：約70m〜80m間隔 (500〜700)
-            spawnIntervalThreshold = Math.floor(500 + Math.random() * 200);
+            // 上級：高密度＆不規則ラッシュ (しきい値 80〜200)
+            spawnIntervalThreshold = Math.floor(80 + Math.random() * 120);
         }
 
         const spawnDist = 1100;
 
-        const canHole = distance >= 500;
-        const canTreeNormal = completedBigJumps >= 1;
-        const canSkier = completedBigJumps >= 1 && (distance - lastLandingDistance >= 500);
-        const canTreeTall = completedBigJumps >= 2;
-        const canHoleLandslide = completedBigJumps >= 2 && (distance - lastLandingDistance >= 500);
+        const canHole = distance >= 400;
+        const canTreeNormal = completedBigJumps >= 1 || distance >= 600;
+        const canSkier = (completedBigJumps >= 1 || distance >= 800) && (distance - lastLandingDistance >= 300);
+        const canTreeTall = completedBigJumps >= 2 || distance >= 1200;
+        const canHoleLandslide = (completedBigJumps >= 2 || distance >= 1500) && (distance - lastLandingDistance >= 300);
 
         let candidates = ["snowman"];
 
-        if (distance >= 500 && Math.random() < 0.35) candidates.push("snowman_multi");
+        if (distance >= 300 && Math.random() < 0.4) candidates.push("snowman_multi");
         if (canHole) candidates.push("hole");
         if (canTreeNormal) candidates.push("tree_normal");
         if (canSkier) candidates.push("skier");
@@ -699,7 +699,7 @@ function updateSpawns() {
         } else if (chosen === "snowman_multi") {
             const snowCount = Math.random() < 0.6 ? 2 : 3;
             for (let k = 0; k < snowCount; k++) {
-                obstacles.push({ type: "snowman", dist: spawnDist + (k * 45), w: 38, h: 48 });
+                obstacles.push({ type: "snowman", dist: spawnDist + (k * 42), w: 38, h: 48 });
             }
         } else if (chosen === "hole" || chosen === "hole_landslide") {
             obstacles.push(createHoleObstacle(spawnDist));
@@ -723,8 +723,8 @@ function triggerBigJump(rampObs) {
     player.slowFallTicks = 0;
     player.tapCountInAir = 0;
     
-    speed = BASE_SPEED; // 通常の滑走スピードに固定
-    player.jumpStartDist = distance; // 空中進空距離計算の基準点
+    speed = BASE_SPEED;
+    player.jumpStartDist = distance;
     lastJumpDist = 0;
 
     sfx.playBigJump();
@@ -1011,6 +1011,7 @@ function render() {
         const y1 = getSlopeY(x1);
         const y2 = getSlopeY(x2);
 
+        // 面の塗りつぶし
         ctx.beginPath();
         ctx.moveTo(x1, y1);
 
@@ -1025,10 +1026,10 @@ function render() {
         ctx.closePath();
         ctx.fill();
 
+        // 輪郭線は滑走面の曲線部分のみをストローク（垂直の縦線を描かない）
         ctx.beginPath();
         ctx.moveTo(x1, y1);
         ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x2, y2 - height);
-        ctx.lineTo(x2, GAME_HEIGHT + 100);
         ctx.stroke();
 
         ctx.fillStyle = "#ffffff";
