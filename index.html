@@ -25,12 +25,15 @@
             ========================================= -->
             <div id="ui-layer" class="ui-layer">
 
-                <!-- プレイ中HUD（スコアなど） -->
+                <!-- プレイ中HUD（スコア・ポーズボタン） -->
                 <div id="hud" class="hud">
-                    <div class="hud-score">
+                    <!-- 左下：距離（DISTANCE）表示 -->
+                    <div class="hud-score-left">
                         <span class="hud-score-label">DISTANCE</span>
                         <span id="score-value" class="hud-score-value">0m</span>
                     </div>
+
+                    <!-- 右上：ポーズボタン -->
                     <button id="btn-pause" class="btn-icon" aria-label="ポーズ">Ⅱ</button>
                 </div>
 
@@ -95,8 +98,11 @@
                             </div>
                         </div>
 
-                        <button id="btn-retry" class="btn-game btn-game-primary">PLAY AGAIN 🔄</button>
-                        <button id="btn-gameover-home" class="btn-game btn-game-secondary">TITLE MENU 🏠</button>
+                        <!-- ボタン2個を横並びにして縦長化を防止 -->
+                        <div class="button-row">
+                            <button id="btn-retry" class="btn-game btn-game-primary">PLAY AGAIN 🔄</button>
+                            <button id="btn-gameover-home" class="btn-game btn-game-secondary">TITLE 🏠</button>
+                        </div>
                     </div>
                 </div>
 

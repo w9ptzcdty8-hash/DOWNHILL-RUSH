@@ -406,7 +406,6 @@ function isInteractiveElement(target) {
 }
 
 function onPrimaryAction() {
-    // プレイ中（標準滑走 / 大ジャンプ）以外は一切アクションを行わない
     if (state !== STATE.PLAYING && state !== STATE.BIG_JUMPING) return;
     if (player.isFallingInHole) return;
 
@@ -445,7 +444,6 @@ function onPrimaryAction() {
 function bindButtonClick(button, handler) {
     if (!button) return;
     
-    // タッチ＆クリックの二重処理防止とイベント伝播遮断
     const handleEvent = (e) => {
         e.stopPropagation();
         if (e.type === "touchstart") e.preventDefault();
@@ -462,13 +460,11 @@ function bindButtonClick(button, handler) {
 }
 
 function initInputHandlers() {
-    // 画面全体（黒帯部分含む）のタップをゲームプレイ用としてキャッチ
     const handleGlobalStart = (event) => {
         if (isInteractiveElement(event.target)) return;
 
         sfx.unlock();
 
-        // プレイ中のみ画面全域のタップをアクションとして受け付ける
         if (state === STATE.PLAYING || state === STATE.BIG_JUMPING) {
             if (event.type === "touchstart") event.preventDefault();
             onPrimaryAction();
@@ -478,9 +474,8 @@ function initInputHandlers() {
     window.addEventListener("touchstart", handleGlobalStart, { passive: false });
     window.addEventListener("mousedown", handleGlobalStart);
 
-    // キーボード入力 (Spaceキー)
     window.addEventListener("keydown", (e) => {
-        if (e.repeat) return; // 長押しでの連続発火を防止
+        if (e.repeat) return;
 
         if (e.code === "Space") {
             sfx.unlock();
@@ -496,7 +491,6 @@ function initInputHandlers() {
         }
     });
 
-    // 各DOMボタンイベントのバインド
     bindButtonClick(btnPlay, startGame);
     bindButtonClick(btnHighscore, showHighScoreModal);
     bindButtonClick(btnCloseHighscore, goToTitle);
@@ -538,6 +532,7 @@ let feedbackTimer = 0;
 
 let completedBigJumps = 0;
 let lastLandingDistance = 0;
+let nextRampTargetDistance = 1000;
 
 const PLAYER_X = 200;
 const player = {
@@ -590,6 +585,7 @@ function resetGame() {
     
     completedBigJumps = 0;
     lastLandingDistance = 0;
+    nextRampTargetDistance = 1000;
 
     feedbackText = "";
     feedbackTimer = 0;
@@ -612,13 +608,11 @@ function updateSpawns() {
 
     spawnTimer += speed;
 
-    // 1000mごとのジャンプ台生成チェック (すでに画面上にジャンプ台が存在しなければ生成)
-    const hasActiveRamp = obstacles.some(o => o.type === "ramp");
-    const targetRampDist = (completedBigJumps + 1) * 1000;
-
-    if (distance >= targetRampDist && !hasActiveRamp && (distance - lastLandingDistance >= 400)) {
+    // 正確に 1000m, 2000m, 3000m... ごとのジャンプ台生成チェック
+    if (distance >= nextRampTargetDistance) {
         const spawnDist = 1100;
         obstacles.push({ type: "ramp", dist: spawnDist, w: 100, h: 45, triggered: false });
+        nextRampTargetDistance = 99999999; // 出現済みとして一時的にロック
         spawnTimer = -200;
         return;
     }
@@ -836,6 +830,9 @@ function update(dtMs) {
 
             completedBigJumps++;
             lastLandingDistance = distance;
+            
+            // 次の目標距離（1000m単位の次区切り）を再設定
+            nextRampTargetDistance = (completedBigJumps + 1) * 1000;
 
             feedbackText = `BIG JUMP #${jumpHistory.length}: +${lastJumpDist}m!`;
             feedbackTimer = 60;
