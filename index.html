@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="format-detection" content="telephone=no">
+
+    <title>Ski Downhill Rush - MRS GAMES</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- ========================================
+         プレイエリア（広告枠を除いた領域）
+    ========================================= -->
+    <div id="play-area">
+        <div id="game-stage">
+
+            <!-- ゲーム描画用Canvas（論理解像度 960x540 / 16:9） -->
+            <canvas id="game-canvas"></canvas>
+
+            <!-- ========================================
+                 UIレイヤー（Canvasの上に重ねるDOM UI）
+            ========================================= -->
+            <div id="ui-layer" class="ui-layer">
+
+                <!-- プレイ中HUD（スコアなど） -->
+                <div id="hud" class="hud">
+                    <div class="hud-score">
+                        <span class="hud-score-label">DISTANCE</span>
+                        <span id="score-value" class="hud-score-value">0m</span>
+                    </div>
+                    <button id="btn-pause" class="btn-icon" aria-label="ポーズ">Ⅱ</button>
+                </div>
+
+                <!-- ---------------- タイトル画面 ---------------- -->
+                <div id="screen-title" class="screen">
+                    <div class="screen-panel">
+                        <p class="game-eyebrow">HIGH-SPEED MOUNTAIN ACTION</p>
+                        <h1 class="game-title">SKI DOWNHILL RUSH</h1>
+                        <p id="best-score-display" class="game-sub">BEST SCORE: 0 pts</p>
+
+                        <button id="btn-play" class="btn-game btn-game-primary">START GAME ⛷️</button>
+                        <button id="btn-highscore" class="btn-game btn-game-secondary">HIGH SCORES 🏆</button>
+
+                        <div class="mrs-games-link-container">
+                            <a href="https://mrs-games.pages.dev" target="_blank" rel="noopener noreferrer" class="mrs-games-link">MRS GAMES</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ---------------- ハイスコアモーダル ---------------- -->
+                <div id="screen-highscore" class="screen hidden">
+                    <div class="screen-panel">
+                        <h2 class="screen-heading">RECORD BOARD 🏆</h2>
+                        
+                        <div class="score-board-details">
+                            <p class="score-line-highlight">TOP SCORE: <span id="modal-top-score">0</span> pts</p>
+                            <p class="score-line">Best Downhill Run: <span id="modal-best-dist">0</span>m</p>
+                            <p class="score-line">Best Airtime Bonus: +<span id="modal-best-jump">0</span>m</p>
+                        </div>
+
+                        <button id="btn-close-highscore" class="btn-game btn-game-primary">CLOSE</button>
+                    </div>
+                </div>
+
+                <!-- ---------------- ポーズ画面 ---------------- -->
+                <div id="screen-pause" class="screen hidden">
+                    <div class="screen-panel">
+                        <h2 class="screen-heading">PAUSE</h2>
+                        <button id="btn-resume" class="btn-game btn-game-primary">RESUME</button>
+                        <button id="btn-pause-home" class="btn-game btn-game-secondary">HOME</button>
+                    </div>
+                </div>
+
+                <!-- ---------------- ゲームオーバー画面 ---------------- -->
+                <div id="screen-gameover" class="screen hidden">
+                    <div class="screen-panel">
+                        <h2 class="screen-heading screen-heading-danger">CRASHED!</h2>
+                        <p id="gameover-newrecord" class="new-record-badge hidden">🎉 NEW HIGH SCORE! 🎉</p>
+
+                        <div class="gameover-breakdown">
+                            <div class="breakdown-row">
+                                <span>• DOWNHILL RUN</span>
+                                <span id="go-dist-val" class="val-blue">0m</span>
+                            </div>
+                            <div id="go-jumps-container" class="breakdown-jumps">
+                                <!-- JSで動的生成 -->
+                            </div>
+                            <div class="breakdown-divider"></div>
+                            <div class="breakdown-row breakdown-total">
+                                <span>TOTAL SCORE</span>
+                                <span id="gameover-score-value" class="val-gold">0 pts</span>
+                            </div>
+                        </div>
+
+                        <button id="btn-retry" class="btn-game btn-game-primary">PLAY AGAIN 🔄</button>
+                        <button id="btn-gameover-home" class="btn-game btn-game-secondary">TITLE MENU 🏠</button>
+                    </div>
+                </div>
+
+            </div>
+            <!-- /.ui-layer -->
+
+        </div>
+        <!-- /#game-stage -->
+    </div>
+    <!-- /#play-area -->
+
+    <!-- ========================================
+         固定広告
+    ========================================= -->
+    <div class="ad-banner">
+        <div style="max-width: 100%;">
+            <!-- admax -->
+            <script src="https://adm.shinobi.jp/s/8a495d941206bf0c34aff9559f8d2cea"></script>
+            <!-- admax -->
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
