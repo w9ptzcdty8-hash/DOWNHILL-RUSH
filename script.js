@@ -447,7 +447,7 @@ function initInputHandlers() {
         sfx.unlock();
 
         if (state === STATE.TITLE) {
-            startGame();
+            // タイトル画面でボタン以外の領域をタップしても勝手にスタートしないように除外
             return;
         }
 
@@ -455,6 +455,9 @@ function initInputHandlers() {
     };
 
     stage.addEventListener("touchstart", (event) => {
+        // ボタン要素上のタップはpreventDefaultせずブラウザのclickイベントに任せる
+        if (isInteractiveElement(event.target)) return;
+        
         event.preventDefault();
         startHandler(event);
     }, { passive: false });
