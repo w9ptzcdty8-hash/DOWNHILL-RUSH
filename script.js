@@ -406,6 +406,8 @@ function isInteractiveElement(target) {
 }
 
 function onPrimaryAction() {
+    // プレイ中（標準滑走 / 大ジャンプ）以外は一切アクションを行わない
+    if (state !== STATE.PLAYING && state !== STATE.BIG_JUMPING) return;
     if (player.isFallingInHole) return;
 
     if (state === STATE.PLAYING) {
@@ -440,57 +442,74 @@ function onPrimaryAction() {
     }
 }
 
-function initInputHandlers() {
-    const startHandler = (event) => {
-        if (isInteractiveElement(event.target)) return;
-        
+function bindButtonClick(button, handler) {
+    if (!button) return;
+    
+    // タッチ＆クリックの二重処理防止とイベント伝播遮断
+    const handleEvent = (e) => {
+        e.stopPropagation();
+        if (e.type === "touchstart") e.preventDefault();
         sfx.unlock();
-
-        if (state === STATE.TITLE) {
-            // タイトル画面でボタン以外の領域をタップしても勝手にスタートしないように除外
-            return;
-        }
-
-        onPrimaryAction();
+        handler();
     };
 
-    stage.addEventListener("touchstart", (event) => {
-        // ボタン要素上のタップはpreventDefaultせずブラウザのclickイベントに任せる
+    button.addEventListener("touchstart", handleEvent, { passive: false });
+    button.addEventListener("click", (e) => {
+        e.stopPropagation();
+        sfx.unlock();
+        handler();
+    });
+}
+
+function initInputHandlers() {
+    // 画面全体（黒帯部分含む）のタップをゲームプレイ用としてキャッチ
+    const handleGlobalStart = (event) => {
         if (isInteractiveElement(event.target)) return;
-        
-        event.preventDefault();
-        startHandler(event);
-    }, { passive: false });
 
-    stage.addEventListener("mousedown", startHandler);
+        sfx.unlock();
 
+        // プレイ中のみ画面全域のタップをアクションとして受け付ける
+        if (state === STATE.PLAYING || state === STATE.BIG_JUMPING) {
+            if (event.type === "touchstart") event.preventDefault();
+            onPrimaryAction();
+        }
+    };
+
+    window.addEventListener("touchstart", handleGlobalStart, { passive: false });
+    window.addEventListener("mousedown", handleGlobalStart);
+
+    // キーボード入力 (Spaceキー)
     window.addEventListener("keydown", (e) => {
+        if (e.repeat) return; // 長押しでの連続発火を防止
+
         if (e.code === "Space") {
+            sfx.unlock();
             if (state === STATE.TITLE) {
                 startGame();
             } else if (state === STATE.HIGHSCORE_MODAL) {
                 goToTitle();
             } else if (state === STATE.GAMEOVER) {
                 startGame();
-            } else {
+            } else if (state === STATE.PLAYING || state === STATE.BIG_JUMPING) {
                 onPrimaryAction();
             }
         }
     });
 
-    btnPlay.addEventListener("click", startGame);
-    btnHighscore.addEventListener("click", showHighScoreModal);
-    btnCloseHighscore.addEventListener("click", goToTitle);
+    // 各DOMボタンイベントのバインド
+    bindButtonClick(btnPlay, startGame);
+    bindButtonClick(btnHighscore, showHighScoreModal);
+    bindButtonClick(btnCloseHighscore, goToTitle);
 
-    btnPause.addEventListener("click", pauseGame);
-    btnResume.addEventListener("click", resumeGame);
-    btnPauseHome.addEventListener("click", () => {
+    bindButtonClick(btnPause, pauseGame);
+    bindButtonClick(btnResume, resumeGame);
+    bindButtonClick(btnPauseHome, () => {
         hideAllScreens();
         goToTitle();
     });
 
-    btnRetry.addEventListener("click", startGame);
-    btnGameoverHome.addEventListener("click", goToTitle);
+    bindButtonClick(btnRetry, startGame);
+    bindButtonClick(btnGameoverHome, goToTitle);
 }
 
 
@@ -540,7 +559,6 @@ const player = {
 let particles = [];
 let obstacles = [];
 let spawnTimer = 0;
-let nextRampTargetDistance = 1000;
 
 function createSnowSpray(x, y, count = 10) {
     for (let i = 0; i < count; i++) {
@@ -572,7 +590,6 @@ function resetGame() {
     
     completedBigJumps = 0;
     lastLandingDistance = 0;
-    nextRampTargetDistance = 1000;
 
     feedbackText = "";
     feedbackTimer = 0;
@@ -595,16 +612,14 @@ function updateSpawns() {
 
     spawnTimer += speed;
 
-    if (distance >= nextRampTargetDistance) {
+    // 1000mごとのジャンプ台生成チェック (すでに画面上にジャンプ台が存在しなければ生成)
+    const hasActiveRamp = obstacles.some(o => o.type === "ramp");
+    const targetRampDist = (completedBigJumps + 1) * 1000;
+
+    if (distance >= targetRampDist && !hasActiveRamp && (distance - lastLandingDistance >= 400)) {
         const spawnDist = 1100;
         obstacles.push({ type: "ramp", dist: spawnDist, w: 100, h: 45, triggered: false });
-        nextRampTargetDistance = 99999999;
         spawnTimer = -200;
-        return;
-    }
-
-    const currentDist = distance;
-    if (Math.abs(currentDist - nextRampTargetDistance) < 15) {
         return;
     }
 
@@ -821,7 +836,6 @@ function update(dtMs) {
 
             completedBigJumps++;
             lastLandingDistance = distance;
-            nextRampTargetDistance = distance + 1000;
 
             feedbackText = `BIG JUMP #${jumpHistory.length}: +${lastJumpDist}m!`;
             feedbackTimer = 60;

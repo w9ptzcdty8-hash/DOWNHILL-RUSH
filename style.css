@@ -22,9 +22,9 @@
     --color-text-dim: #8a92b8;
 
     /* 形状 */
-    --radius-lg: 22px;
-    --radius-md: 14px;
-    --radius-sm: 8px;
+    --radius-lg: 18px;
+    --radius-md: 12px;
+    --radius-sm: 6px;
 
     /* フォント */
     --font-display: "Helvetica Neue", Arial, "Hiragino Sans", sans-serif;
@@ -110,36 +110,37 @@ button {
 
 .hud {
     position: absolute;
-    top: 14px;
-    left: 14px;
-    right: 14px;
+    top: 10px;
+    left: 10px;
+    right: 10px;
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     pointer-events: none;
+    z-index: 10;
 }
 
 .hud-score {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 2px;
-    padding: 6px 14px;
-    background: rgba(9, 12, 22, 0.55);
+    gap: 1px;
+    padding: 4px 10px;
+    background: rgba(9, 12, 22, 0.65);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
     backdrop-filter: blur(4px);
 }
 
 .hud-score-label {
-    font-size: 0.6rem;
-    letter-spacing: 2px;
+    font-size: 0.55rem;
+    letter-spacing: 1.5px;
     color: var(--color-text-dim);
 }
 
 .hud-score-value {
     font-family: var(--font-mono);
-    font-size: 1.4rem;
+    font-size: 1.2rem;
     font-weight: 700;
     color: var(--color-gold);
     line-height: 1;
@@ -148,13 +149,13 @@ button {
 
 .btn-icon {
     pointer-events: auto;
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
     border: 1px solid var(--color-border);
     border-radius: 50%;
-    background: rgba(9, 12, 22, 0.55);
+    background: rgba(9, 12, 22, 0.65);
     color: var(--color-text);
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -175,10 +176,11 @@ button {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 24px;
-    background: rgba(6, 8, 16, 0.72);
+    padding: 12px;
+    background: rgba(6, 8, 16, 0.82);
     backdrop-filter: blur(6px);
     pointer-events: auto;
+    z-index: 20;
     transition: opacity 0.2s ease;
 }
 
@@ -188,18 +190,18 @@ button {
 
 .screen-panel {
     width: 100%;
-    max-width: 440px;
-    max-height: 90vh;
+    max-width: 380px;
+    max-height: 96%;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
-    padding: 24px 20px;
+    gap: 8px;
+    padding: 16px 18px;
     background: linear-gradient(180deg, var(--color-surface) 0%, var(--color-bg-2) 100%);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
     text-align: center;
 }
 
@@ -207,38 +209,38 @@ button {
 
 .game-eyebrow {
     margin: 0;
-    font-size: 0.7rem;
-    letter-spacing: 3px;
+    font-size: 0.65rem;
+    letter-spacing: 2.5px;
     color: var(--color-accent);
     font-weight: 700;
 }
 
 .game-title {
-    margin: 2px 0 0 0;
+    margin: 1px 0 0 0;
     font-family: var(--font-display);
-    font-size: 1.8rem;
+    font-size: 1.5rem;
     font-weight: 800;
     letter-spacing: 1px;
     color: var(--color-text);
-    text-shadow: 0 0 24px var(--color-accent-soft);
+    text-shadow: 0 0 20px var(--color-accent-soft);
 }
 
 .game-sub {
-    margin: 0 0 10px 0;
-    font-size: 0.9rem;
+    margin: 0 0 6px 0;
+    font-size: 0.8rem;
     font-weight: 700;
     color: var(--color-gold);
 }
 
 .mrs-games-link-container {
-    margin-top: 10px;
+    margin-top: 4px;
 }
 
 .mrs-games-link {
     display: inline-block;
-    padding: 4px 10px;
+    padding: 2px 8px;
     color: var(--color-text-dim);
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     text-decoration: underline;
     transition: color 0.2s;
 }
@@ -251,40 +253,40 @@ button {
 /* ---------------- 見出し（ポーズ / ゲームオーバー） ---------------- */
 
 .screen-heading {
-    margin: 0 0 4px 0;
+    margin: 0;
     font-family: var(--font-display);
-    font-size: 1.5rem;
+    font-size: 1.35rem;
     font-weight: 800;
-    letter-spacing: 2px;
+    letter-spacing: 1.5px;
     color: var(--color-text);
 }
 
 .screen-heading-danger {
     color: var(--color-danger);
-    text-shadow: 0 0 24px var(--color-danger-soft);
+    text-shadow: 0 0 20px var(--color-danger-soft);
 }
 
 /* ---------------- スコアボード詳細（モーダル・ゲームオーバー） ---------------- */
 
 .score-board-details {
     width: 100%;
-    padding: 12px 16px;
+    padding: 8px 12px;
     background: rgba(9, 12, 22, 0.55);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    margin-bottom: 6px;
+    margin-bottom: 2px;
 }
 
 .score-line-highlight {
-    margin: 0 0 8px 0;
-    font-size: 1.1rem;
+    margin: 0 0 4px 0;
+    font-size: 0.95rem;
     font-weight: 800;
     color: var(--color-gold);
 }
 
 .score-line {
-    margin: 4px 0;
-    font-size: 0.85rem;
+    margin: 2px 0;
+    font-size: 0.75rem;
     color: var(--color-text-dim);
 }
 
@@ -294,22 +296,22 @@ button {
 }
 
 .new-record-badge {
-    margin: 0 0 6px 0;
-    font-size: 0.95rem;
+    margin: -2px 0 2px 0;
+    font-size: 0.85rem;
     font-weight: 800;
     color: var(--color-gold);
 }
 
 .gameover-breakdown {
     width: 100%;
-    padding: 12px 16px;
-    background: rgba(9, 12, 22, 0.6);
+    padding: 8px 12px;
+    background: rgba(9, 12, 22, 0.65);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    font-size: 0.85rem;
+    gap: 4px;
+    font-size: 0.75rem;
     text-align: left;
 }
 
@@ -323,17 +325,17 @@ button {
 .breakdown-jumps {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
 }
 
 .breakdown-divider {
     height: 1px;
     background: var(--color-border);
-    margin: 4px 0;
+    margin: 2px 0;
 }
 
 .breakdown-total {
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: 800;
     color: var(--color-text);
 }
@@ -346,27 +348,28 @@ button {
 
 .btn-game {
     width: 100%;
-    min-height: 44px;
-    margin-top: 2px;
+    min-height: 38px;
+    margin-top: 1px;
     border: none;
     border-radius: var(--radius-md);
-    font-size: 0.95rem;
+    font-size: 0.85rem;
     font-weight: 800;
     letter-spacing: 1px;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: transform 0.1s, box-shadow 0.2s, opacity 0.2s;
+    pointer-events: auto;
 }
 
 .btn-game:active {
-    transform: scale(0.97);
+    transform: scale(0.96);
 }
 
 .btn-game-primary {
     color: #05261f;
     background: linear-gradient(180deg, var(--color-accent) 0%, #1fb89e 100%);
-    box-shadow: 0 8px 24px var(--color-accent-soft);
+    box-shadow: 0 6px 18px var(--color-accent-soft);
 }
 
 .btn-game-secondary {
@@ -379,19 +382,25 @@ button {
    Responsive
 ======================================== */
 
-@media (max-width: 480px) {
+@media (max-height: 400px) {
     .screen-panel {
-        padding: 16px 14px;
-        gap: 8px;
+        padding: 10px 14px;
+        gap: 4px;
     }
 
     .game-title {
-        font-size: 1.4rem;
+        font-size: 1.2rem;
     }
 
     .btn-game {
-        min-height: 40px;
-        font-size: 0.85rem;
+        min-height: 34px;
+        font-size: 0.78rem;
+    }
+
+    .gameover-breakdown {
+        padding: 6px 10px;
+        gap: 2px;
+        font-size: 0.7rem;
     }
 }
 
