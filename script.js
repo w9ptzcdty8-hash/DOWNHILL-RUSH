@@ -106,6 +106,7 @@ function checkCollision(rectA, rectB, padding = 0) {
         rectA.x + padding < rectB.x + rectB.width - padding &&
         rectA.x + rectA.width - padding > rectB.x + padding &&
         rectA.y + padding < rectB.y + rectB.height - padding &&
+        rectA.y + padding < rectB.y + rectB.height - padding &&
         rectA.y + rectA.height - padding > rectB.y + padding
     );
 }
@@ -547,7 +548,7 @@ let speed = BASE_SPEED;
 
 let distance = 0;
 let totalJumpDistance = 0;
-let lastJumpDist = 0;
+let lastJumpDist = 0; // 直近（または現在ジャンプ中）の獲得ボーナス距離
 let jumpHistory = [];
 let feedbackText = "";
 let feedbackTimer = 0;
@@ -722,7 +723,7 @@ function triggerBigJump(rampObs) {
     player.slowFallTicks = 0;
     player.tapCountInAir = 0;
     
-    speed = BASE_SPEED; // 通常の滑走スピードに固定（加速しない）
+    speed = BASE_SPEED; // 通常の滑走スピードに固定
     player.jumpStartDist = distance; // 空中進空距離計算の基準点
     lastJumpDist = 0;
 
@@ -744,12 +745,12 @@ function update(dtMs) {
         setScore(Math.floor(distance));
 
         if (state === STATE.BIG_JUMPING) {
-            // 空中で実際に前進した滑走距離（メートル数）をそのままボーナスとする（100%整合）
+            // 現在大ジャンプ中の飛距離（単体）を計算
             lastJumpDist = distance - player.jumpStartDist;
         }
 
-        const currentJumpBonus = totalJumpDistance + Math.floor(lastJumpDist);
-        updateJumpBonusUI(currentJumpBonus);
+        // プレイ中のHUD（画面左下）には「直近または現在ジャンプ中」の数値のみを表示
+        updateJumpBonusUI(Math.floor(lastJumpDist));
 
         updateSpawns();
 
@@ -882,6 +883,7 @@ function update(dtMs) {
             if (player.vAir < 0) player.vAir = 0;
         }
 
+        // 着地判定
         if (player.airOffset <= 0) {
             player.airOffset = 0;
             player.vAir = 0;
@@ -890,6 +892,7 @@ function update(dtMs) {
             createSnowSpray(player.slopeX, getSlopeY(player.slopeX), 20);
             sfx.playLanding();
 
+            // 獲得ボーナス距離を確定し、履歴および累計にのみ加算（HUDは確定直近値を保持表示）
             const landedJumpBonus = Math.floor(lastJumpDist);
             jumpHistory.push(landedJumpBonus);
             totalJumpDistance += landedJumpBonus;
@@ -946,18 +949,6 @@ function render() {
     ctx.fill();
 
     const sortedObs = [...obstacles].sort((a, b) => a.dist - b.dist);
-
-    sortedObs.forEach(obs => {
-        if (obs.type === "ramp") {
-            const rStart = obs.dist - obs.w / 2;
-            ctx.strokeStyle = "#2b384a";
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(rStart, getSlopeY(rStart));
-            ctx.lineTo(rStart, GAME_HEIGHT + 100);
-            ctx.stroke();
-        }
-    });
 
     ctx.fillStyle = "#ffffff";
     ctx.strokeStyle = "#2b384a";
