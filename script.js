@@ -426,7 +426,7 @@ function onPrimaryAction() {
             player.isJumping = true;
             player.tapCountInAir = 0;
             player.slowFallTicks = 0;
-            player.lastFlapTime = now; // 初回ジャンプ時間を記録
+            player.lastFlapTime = now;
             
             sfx.playJump();
             createSnowSpray(player.slopeX, getSlopeY(player.slopeX), 8);
@@ -542,8 +542,7 @@ function getSlopeY(x) {
     return SLOPE_ORIGIN_Y + x * Math.tan(SLOPE_ANGLE);
 }
 
-const BASE_SPEED = 7.0;
-const BIG_JUMP_SPEED = 11.0; // 大ジャンプ中は加速して飛距離を伸ばす
+const BASE_SPEED = 7.0; // 通常・大ジャンプ共通速度（一定速度でスクロール）
 let speed = BASE_SPEED;
 
 let distance = 0;
@@ -558,7 +557,7 @@ let lastLandingDistance = 0;
 let nextRampTargetDistance = 1000;
 
 // 障害物出現の動的難易度調整用タイマー
-let spawnIntervalThreshold = 800;
+let spawnIntervalThreshold = 1600;
 
 const PLAYER_X = 200;
 const player = {
@@ -616,9 +615,9 @@ function resetGame() {
     obstacles = [];
     particles = [];
     
-    // ゲーム開始直後はしばらく敵を出さない(無敵区間)
+    // ゲーム開始直後はしばらく敵を出さない(約200m無敵区間)
     spawnTimer = -400; 
-    spawnIntervalThreshold = 800; 
+    spawnIntervalThreshold = 1600; // 0m時点は200mに1回前後のゆったりペース
     
     completedBigJumps = 0;
     lastLandingDistance = 0;
@@ -657,22 +656,22 @@ function updateSpawns() {
         return;
     }
 
-    // 滑走距離に応じた動的難易度スケーリング（序盤はスカスカ、徐々に密度アップ）
+    // 0m〜約200m毎からスタートし、走行距離に応じて密度を調整
     if (spawnTimer > spawnIntervalThreshold) {
         spawnTimer = 0;
 
         if (distance < 500) {
-            // 超初級：ギミック激減（間隔 700〜1100）
-            spawnIntervalThreshold = Math.floor(700 + Math.random() * 400);
+            // 超初級：約200m間隔 (1500〜1800)
+            spawnIntervalThreshold = Math.floor(1500 + Math.random() * 300);
         } else if (distance < 1200) {
-            // 初級：ゆったり（間隔 500〜800）
-            spawnIntervalThreshold = Math.floor(500 + Math.random() * 300);
+            // 初級：約150m間隔 (1100〜1400)
+            spawnIntervalThreshold = Math.floor(1100 + Math.random() * 300);
         } else if (distance < 2500) {
-            // 中級：標準的（間隔 300〜550）
-            spawnIntervalThreshold = Math.floor(300 + Math.random() * 250);
+            // 中級：約100m間隔 (700〜1000)
+            spawnIntervalThreshold = Math.floor(700 + Math.random() * 300);
         } else {
-            // 上級：高密度（間隔 200〜400）
-            spawnIntervalThreshold = Math.floor(200 + Math.random() * 200);
+            // 上級：約70m〜80m間隔 (500〜700)
+            spawnIntervalThreshold = Math.floor(500 + Math.random() * 200);
         }
 
         const spawnDist = 1100;
@@ -723,9 +722,8 @@ function triggerBigJump(rampObs) {
     player.slowFallTicks = 0;
     player.tapCountInAir = 0;
     
-    // スピードアップして「遠くまで飛ぶ」爽快感とボーナス距離を稼ぐ
-    speed = BIG_JUMP_SPEED;
-    player.jumpStartDist = distance; // 飛行ボーナスの起点
+    speed = BASE_SPEED; // 通常の滑走スピードに固定（加速しない）
+    player.jumpStartDist = distance; // 空中進空距離計算の基準点
     lastJumpDist = 0;
 
     sfx.playBigJump();
@@ -746,7 +744,7 @@ function update(dtMs) {
         setScore(Math.floor(distance));
 
         if (state === STATE.BIG_JUMPING) {
-            // ★ 空中で物理的に進んだ滑走距離（差分）をそっくりそのままジャンプボーナスとする（完全整合）
+            // 空中で実際に前進した滑走距離（メートル数）をそのままボーナスとする（100%整合）
             lastJumpDist = distance - player.jumpStartDist;
         }
 
@@ -820,7 +818,6 @@ function update(dtMs) {
             // 画面左端へ画面外消滅した場合の処理
             if (obs.dist < -200 || (obs.falling && obs.fallY > GAME_HEIGHT)) {
                 if (obs.type === "ramp") {
-                    // スルーした場合でも次の1000m区切りを自動設定
                     nextRampTargetDistance = Math.ceil((distance + 800) / 1000) * 1000;
                 }
                 obstacles.splice(i, 1);
@@ -889,7 +886,6 @@ function update(dtMs) {
             player.airOffset = 0;
             player.vAir = 0;
             state = STATE.PLAYING;
-            speed = BASE_SPEED; // スピードを通常に戻す
 
             createSnowSpray(player.slopeX, getSlopeY(player.slopeX), 20);
             sfx.playLanding();
