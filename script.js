@@ -407,7 +407,7 @@ function initBackButtonGuard() {
 
 
 // ========================================
-// 9. 操作入力
+// 9. 操作入力 (連打カクツキ防止)
 // ========================================
 
 function isInteractiveElement(target) {
@@ -418,15 +418,20 @@ function onPrimaryAction() {
     if (state !== STATE.PLAYING && state !== STATE.BIG_JUMPING) return;
     if (player.isFallingInHole) return;
 
+    const now = Date.now();
+
     if (state === STATE.PLAYING) {
         if (!player.isJumping) {
             player.vAir = player.jumpPower;
             player.isJumping = true;
             player.tapCountInAir = 0;
             player.slowFallTicks = 0;
+            player.lastFlapTime = now; // 初回ジャンプ時間を記録
+            
             sfx.playJump();
             createSnowSpray(player.slopeX, getSlopeY(player.slopeX), 8);
         } else {
+            // 空中での羽ばたき
             player.slowFallTicks = 16;
             player.tapCountInAir++;
 
@@ -434,10 +439,15 @@ function onPrimaryAction() {
                 player.vAir *= 0.5;
             }
 
-            sfx.playFlap();
-            createSnowSpray(player.slopeX - 5, getSlopeY(player.slopeX) - player.airOffset, 2);
+            // 連打によるAudioContextおよびパーティクル過負荷の防止 (120msのクールダウン)
+            if (now - player.lastFlapTime > 120) {
+                sfx.playFlap();
+                createSnowSpray(player.slopeX - 5, getSlopeY(player.slopeX) - player.airOffset, 2);
+                player.lastFlapTime = now;
+            }
         }
     } else if (state === STATE.BIG_JUMPING) {
+        // 大ジャンプ中の羽ばたき
         player.slowFallTicks = 18;
         player.tapCountInAir++;
 
@@ -445,8 +455,11 @@ function onPrimaryAction() {
             player.vAir *= 0.5;
         }
 
-        sfx.playFlap();
-        createSnowSpray(player.slopeX - 5, getSlopeY(player.slopeX) - player.airOffset, 3);
+        if (now - player.lastFlapTime > 120) {
+            sfx.playFlap();
+            createSnowSpray(player.slopeX - 5, getSlopeY(player.slopeX) - player.airOffset, 3);
+            player.lastFlapTime = now;
+        }
     }
 }
 
@@ -484,7 +497,7 @@ function initInputHandlers() {
     window.addEventListener("mousedown", handleGlobalStart);
 
     window.addEventListener("keydown", (e) => {
-        if (e.repeat) return;
+        if (e.repeat) return; // 長押し連続発火によるフリーズを防止
 
         if (e.code === "Space") {
             sfx.unlock();
@@ -530,11 +543,12 @@ function getSlopeY(x) {
 }
 
 const BASE_SPEED = 7.0;
+const BIG_JUMP_SPEED = 11.0; // 大ジャンプ中は加速して飛距離を伸ばす
 let speed = BASE_SPEED;
 
 let distance = 0;
 let totalJumpDistance = 0;
-let lastJumpDist = 0; // 実数で精密保持
+let lastJumpDist = 0;
 let jumpHistory = [];
 let feedbackText = "";
 let feedbackTimer = 0;
@@ -544,7 +558,7 @@ let lastLandingDistance = 0;
 let nextRampTargetDistance = 1000;
 
 // 障害物出現の動的難易度調整用タイマー
-let spawnIntervalThreshold = 600;
+let spawnIntervalThreshold = 800;
 
 const PLAYER_X = 200;
 const player = {
@@ -560,14 +574,17 @@ const player = {
 
     isFallingInHole: false,
     fallX: PLAYER_X,
-    fallY: 0
+    fallY: 0,
+
+    lastFlapTime: 0,
+    jumpStartDist: 0 // ジャンプボーナスの完全同期計算用
 };
 
 let particles = [];
 let obstacles = [];
 let spawnTimer = 0;
 
-const MAX_PARTICLES = 60; // タップ連打時のカクつき防止（粒子数の上限）
+const MAX_PARTICLES = 80; // 連打時の描画負荷オーバーガード
 
 function createSnowSpray(x, y, count = 10) {
     if (particles.length >= MAX_PARTICLES) return;
@@ -598,8 +615,10 @@ function resetGame() {
     jumpHistory = [];
     obstacles = [];
     particles = [];
-    spawnTimer = 0;
-    spawnIntervalThreshold = 650; // 最初は間隔を広く（超初級）
+    
+    // ゲーム開始直後はしばらく敵を出さない(無敵区間)
+    spawnTimer = -400; 
+    spawnIntervalThreshold = 800; 
     
     completedBigJumps = 0;
     lastLandingDistance = 0;
@@ -617,6 +636,8 @@ function resetGame() {
     player.isFallingInHole = false;
     player.fallX = PLAYER_X;
     player.fallY = 0;
+    player.lastFlapTime = 0;
+    player.jumpStartDist = 0;
 
     setScore(0);
     updateJumpBonusUI(0);
@@ -636,18 +657,22 @@ function updateSpawns() {
         return;
     }
 
-    // 滑走距離に応じた動的難易度（距離が伸びるほど間隔を短く）
+    // 滑走距離に応じた動的難易度スケーリング（序盤はスカスカ、徐々に密度アップ）
     if (spawnTimer > spawnIntervalThreshold) {
         spawnTimer = 0;
 
-        if (distance < 300) {
-            spawnIntervalThreshold = Math.floor(600 + Math.random() * 300);
-        } else if (distance < 1000) {
-            spawnIntervalThreshold = Math.floor(400 + Math.random() * 250);
-        } else if (distance < 2000) {
-            spawnIntervalThreshold = Math.floor(250 + Math.random() * 200);
+        if (distance < 500) {
+            // 超初級：ギミック激減（間隔 700〜1100）
+            spawnIntervalThreshold = Math.floor(700 + Math.random() * 400);
+        } else if (distance < 1200) {
+            // 初級：ゆったり（間隔 500〜800）
+            spawnIntervalThreshold = Math.floor(500 + Math.random() * 300);
+        } else if (distance < 2500) {
+            // 中級：標準的（間隔 300〜550）
+            spawnIntervalThreshold = Math.floor(300 + Math.random() * 250);
         } else {
-            spawnIntervalThreshold = Math.floor(160 + Math.random() * 190);
+            // 上級：高密度（間隔 200〜400）
+            spawnIntervalThreshold = Math.floor(200 + Math.random() * 200);
         }
 
         const spawnDist = 1100;
@@ -697,6 +722,10 @@ function triggerBigJump(rampObs) {
     player.airOffset = 10;
     player.slowFallTicks = 0;
     player.tapCountInAir = 0;
+    
+    // スピードアップして「遠くまで飛ぶ」爽快感とボーナス距離を稼ぐ
+    speed = BIG_JUMP_SPEED;
+    player.jumpStartDist = distance; // 飛行ボーナスの起点
     lastJumpDist = 0;
 
     sfx.playBigJump();
@@ -716,12 +745,11 @@ function update(dtMs) {
         distance += speed * 0.12;
         setScore(Math.floor(distance));
 
-        // 大ジャンプ中の増加量を滑走距離（speed * 0.12）と同じスケール感に補正
         if (state === STATE.BIG_JUMPING) {
-            lastJumpDist += speed * 0.12 * (player.slowFallTicks > 0 ? 1.4 : 1.0);
+            // ★ 空中で物理的に進んだ滑走距離（差分）をそっくりそのままジャンプボーナスとする（完全整合）
+            lastJumpDist = distance - player.jumpStartDist;
         }
 
-        // ジャンプボーナスを毎フレーム精密同期（現在確定分の整数値を反映）
         const currentJumpBonus = totalJumpDistance + Math.floor(lastJumpDist);
         updateJumpBonusUI(currentJumpBonus);
 
@@ -792,6 +820,7 @@ function update(dtMs) {
             // 画面左端へ画面外消滅した場合の処理
             if (obs.dist < -200 || (obs.falling && obs.fallY > GAME_HEIGHT)) {
                 if (obs.type === "ramp") {
+                    // スルーした場合でも次の1000m区切りを自動設定
                     nextRampTargetDistance = Math.ceil((distance + 800) / 1000) * 1000;
                 }
                 obstacles.splice(i, 1);
@@ -860,6 +889,7 @@ function update(dtMs) {
             player.airOffset = 0;
             player.vAir = 0;
             state = STATE.PLAYING;
+            speed = BASE_SPEED; // スピードを通常に戻す
 
             createSnowSpray(player.slopeX, getSlopeY(player.slopeX), 20);
             sfx.playLanding();
