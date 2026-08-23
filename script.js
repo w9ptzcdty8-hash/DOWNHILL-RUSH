@@ -534,7 +534,7 @@ let speed = BASE_SPEED;
 
 let distance = 0;
 let totalJumpDistance = 0;
-let lastJumpDist = 0;
+let lastJumpDist = 0; // 実数で精密保持
 let jumpHistory = [];
 let feedbackText = "";
 let feedbackTimer = 0;
@@ -640,18 +640,13 @@ function updateSpawns() {
     if (spawnTimer > spawnIntervalThreshold) {
         spawnTimer = 0;
 
-        // 距離に応じた次回の出現しきい値範囲（難易度スケーリング）
         if (distance < 300) {
-            // 超初級：間隔 600〜900 (ギミック数かなり少なめ)
             spawnIntervalThreshold = Math.floor(600 + Math.random() * 300);
         } else if (distance < 1000) {
-            // 初級：間隔 400〜650
             spawnIntervalThreshold = Math.floor(400 + Math.random() * 250);
         } else if (distance < 2000) {
-            // 中級：間隔 250〜450
             spawnIntervalThreshold = Math.floor(250 + Math.random() * 200);
         } else {
-            // 上級：間隔 160〜350
             spawnIntervalThreshold = Math.floor(160 + Math.random() * 190);
         }
 
@@ -721,8 +716,13 @@ function update(dtMs) {
         distance += speed * 0.12;
         setScore(Math.floor(distance));
 
-        // ジャンプボーナスを毎フレームリアルタイム同期（大ジャンプ中の加算も即時反映）
-        const currentJumpBonus = totalJumpDistance + (state === STATE.BIG_JUMPING ? lastJumpDist : 0);
+        // 大ジャンプ中の増加量を滑走距離（speed * 0.12）と同じスケール感に補正
+        if (state === STATE.BIG_JUMPING) {
+            lastJumpDist += speed * 0.12 * (player.slowFallTicks > 0 ? 1.4 : 1.0);
+        }
+
+        // ジャンプボーナスを毎フレーム精密同期（現在確定分の整数値を反映）
+        const currentJumpBonus = totalJumpDistance + Math.floor(lastJumpDist);
         updateJumpBonusUI(currentJumpBonus);
 
         updateSpawns();
@@ -856,8 +856,6 @@ function update(dtMs) {
             if (player.vAir < 0) player.vAir = 0;
         }
 
-        lastJumpDist += Math.floor(speed * 0.6) + (player.slowFallTicks > 0 ? 1 : 0);
-
         if (player.airOffset <= 0) {
             player.airOffset = 0;
             player.vAir = 0;
@@ -866,15 +864,16 @@ function update(dtMs) {
             createSnowSpray(player.slopeX, getSlopeY(player.slopeX), 20);
             sfx.playLanding();
 
-            jumpHistory.push(lastJumpDist);
-            totalJumpDistance += lastJumpDist;
+            const landedJumpBonus = Math.floor(lastJumpDist);
+            jumpHistory.push(landedJumpBonus);
+            totalJumpDistance += landedJumpBonus;
 
             completedBigJumps++;
             lastLandingDistance = distance;
             
             nextRampTargetDistance = Math.ceil((distance + 800) / 1000) * 1000;
 
-            feedbackText = `BIG JUMP #${jumpHistory.length}: +${lastJumpDist}m!`;
+            feedbackText = `BIG JUMP #${jumpHistory.length}: +${landedJumpBonus}m!`;
             feedbackTimer = 60;
         }
     }
@@ -1158,7 +1157,7 @@ function render() {
 
             ctx.fillStyle = "#00e676";
             ctx.font = "bold 16px sans-serif";
-            ctx.fillText(`Air Bonus: +${lastJumpDist}m`, px, py - 30);
+            ctx.fillText(`Air Bonus: +${Math.floor(lastJumpDist)}m`, px, py - 30);
         }
 
         if (feedbackTimer > 0) {
