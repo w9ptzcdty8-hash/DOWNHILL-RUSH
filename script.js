@@ -135,7 +135,7 @@ function updateJumpBonusUI(bonusValue) {
 
 
 // ========================================
-// 6. SoundFX (Web Audio API)
+// 6. SoundFX (Web Audio API - 連打軽量化)
 // ========================================
 
 class SoundFX {
@@ -153,7 +153,7 @@ class SoundFX {
     }
 
     playJump() {
-        if (!this.ctx) return;
+        if (!this.ctx || this.ctx.state !== "running") return;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = "sine";
@@ -168,7 +168,7 @@ class SoundFX {
     }
 
     playBigJump() {
-        if (!this.ctx) return;
+        if (!this.ctx || this.ctx.state !== "running") return;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = "triangle";
@@ -183,13 +183,13 @@ class SoundFX {
     }
 
     playFlap() {
-        if (!this.ctx) return;
+        if (!this.ctx || this.ctx.state !== "running") return;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = "sine";
         osc.frequency.setValueAtTime(400, this.ctx.currentTime);
         osc.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.08);
-        gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
+        gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
         osc.connect(gain);
         gain.connect(this.ctx.destination);
@@ -198,7 +198,7 @@ class SoundFX {
     }
 
     playLanding() {
-        if (!this.ctx) return;
+        if (!this.ctx || this.ctx.state !== "running") return;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = "triangle";
@@ -213,7 +213,7 @@ class SoundFX {
     }
 
     playCrash() {
-        if (!this.ctx) return;
+        if (!this.ctx || this.ctx.state !== "running") return;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = "sawtooth";
@@ -228,7 +228,7 @@ class SoundFX {
     }
 
     playNpcFall() {
-        if (!this.ctx) return;
+        if (!this.ctx || this.ctx.state !== "running") return;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = "sawtooth";
@@ -243,7 +243,7 @@ class SoundFX {
     }
 
     playNewRecord() {
-        if (!this.ctx) return;
+        if (!this.ctx || this.ctx.state !== "running") return;
         const now = this.ctx.currentTime;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
@@ -425,7 +425,7 @@ function onPrimaryAction() {
             player.tapCountInAir = 0;
             player.slowFallTicks = 0;
             sfx.playJump();
-            createSnowSpray(player.slopeX, getSlopeY(player.slopeX), 12);
+            createSnowSpray(player.slopeX, getSlopeY(player.slopeX), 8);
         } else {
             player.slowFallTicks = 16;
             player.tapCountInAir++;
@@ -435,7 +435,7 @@ function onPrimaryAction() {
             }
 
             sfx.playFlap();
-            createSnowSpray(player.slopeX - 5, getSlopeY(player.slopeX) - player.airOffset, 4);
+            createSnowSpray(player.slopeX - 5, getSlopeY(player.slopeX) - player.airOffset, 2);
         }
     } else if (state === STATE.BIG_JUMPING) {
         player.slowFallTicks = 18;
@@ -446,7 +446,7 @@ function onPrimaryAction() {
         }
 
         sfx.playFlap();
-        createSnowSpray(player.slopeX - 5, getSlopeY(player.slopeX) - player.airOffset, 5);
+        createSnowSpray(player.slopeX - 5, getSlopeY(player.slopeX) - player.airOffset, 3);
     }
 }
 
@@ -543,8 +543,8 @@ let completedBigJumps = 0;
 let lastLandingDistance = 0;
 let nextRampTargetDistance = 1000;
 
-// 障害物出現間隔のランダム制御用タイマー
-let spawnIntervalThreshold = 350;
+// 障害物出現の動的難易度調整用タイマー
+let spawnIntervalThreshold = 600;
 
 const PLAYER_X = 200;
 const player = {
@@ -567,8 +567,13 @@ let particles = [];
 let obstacles = [];
 let spawnTimer = 0;
 
+const MAX_PARTICLES = 60; // タップ連打時のカクつき防止（粒子数の上限）
+
 function createSnowSpray(x, y, count = 10) {
-    for (let i = 0; i < count; i++) {
+    if (particles.length >= MAX_PARTICLES) return;
+    const spawnCount = Math.min(count, MAX_PARTICLES - particles.length);
+
+    for (let i = 0; i < spawnCount; i++) {
         particles.push({
             x: x,
             y: y,
@@ -594,7 +599,7 @@ function resetGame() {
     obstacles = [];
     particles = [];
     spawnTimer = 0;
-    spawnIntervalThreshold = 350;
+    spawnIntervalThreshold = 650; // 最初は間隔を広く（超初級）
     
     completedBigJumps = 0;
     lastLandingDistance = 0;
@@ -626,15 +631,29 @@ function updateSpawns() {
     if (distance >= nextRampTargetDistance) {
         const spawnDist = 1100;
         obstacles.push({ type: "ramp", dist: spawnDist, w: 100, h: 45, triggered: false });
-        nextRampTargetDistance = 99999999; // 出現済みロック（画面外消滅時または着地時に解除）
+        nextRampTargetDistance = 99999999; // ロック（画面外消滅時または着地時に解除）
         spawnTimer = -250;
         return;
     }
 
-    // ランダムな間隔（180〜520の可変幅）でバラバラに障害物を出現させる
+    // 滑走距離に応じた動的難易度（距離が伸びるほど間隔を短く）
     if (spawnTimer > spawnIntervalThreshold) {
         spawnTimer = 0;
-        spawnIntervalThreshold = Math.floor(180 + Math.random() * 340);
+
+        // 距離に応じた次回の出現しきい値範囲（難易度スケーリング）
+        if (distance < 300) {
+            // 超初級：間隔 600〜900 (ギミック数かなり少なめ)
+            spawnIntervalThreshold = Math.floor(600 + Math.random() * 300);
+        } else if (distance < 1000) {
+            // 初級：間隔 400〜650
+            spawnIntervalThreshold = Math.floor(400 + Math.random() * 250);
+        } else if (distance < 2000) {
+            // 中級：間隔 250〜450
+            spawnIntervalThreshold = Math.floor(250 + Math.random() * 200);
+        } else {
+            // 上級：間隔 160〜350
+            spawnIntervalThreshold = Math.floor(160 + Math.random() * 190);
+        }
 
         const spawnDist = 1100;
 
@@ -701,7 +720,10 @@ function update(dtMs) {
     if (state === STATE.PLAYING || state === STATE.BIG_JUMPING) {
         distance += speed * 0.12;
         setScore(Math.floor(distance));
-        updateJumpBonusUI(totalJumpDistance + (state === STATE.BIG_JUMPING ? lastJumpDist : 0));
+
+        // ジャンプボーナスを毎フレームリアルタイム同期（大ジャンプ中の加算も即時反映）
+        const currentJumpBonus = totalJumpDistance + (state === STATE.BIG_JUMPING ? lastJumpDist : 0);
+        updateJumpBonusUI(currentJumpBonus);
 
         updateSpawns();
 
@@ -769,7 +791,6 @@ function update(dtMs) {
 
             // 画面左端へ画面外消滅した場合の処理
             if (obs.dist < -200 || (obs.falling && obs.fallY > GAME_HEIGHT)) {
-                // ジャンプ台を飛び越えるなどスルーした場合、次の区切り（1000m毎）を自動設定
                 if (obs.type === "ramp") {
                     nextRampTargetDistance = Math.ceil((distance + 800) / 1000) * 1000;
                 }
@@ -805,7 +826,7 @@ function update(dtMs) {
             player.airOffset -= player.vAir;
 
             if (player.airOffset <= 0) {
-                createSnowSpray(player.slopeX, getSlopeY(player.slopeX), 15);
+                createSnowSpray(player.slopeX, getSlopeY(player.slopeX), 12);
                 sfx.playLanding();
                 player.airOffset = 0;
                 player.vAir = 0;
@@ -842,7 +863,7 @@ function update(dtMs) {
             player.vAir = 0;
             state = STATE.PLAYING;
 
-            createSnowSpray(player.slopeX, getSlopeY(player.slopeX), 30);
+            createSnowSpray(player.slopeX, getSlopeY(player.slopeX), 20);
             sfx.playLanding();
 
             jumpHistory.push(lastJumpDist);
@@ -851,7 +872,6 @@ function update(dtMs) {
             completedBigJumps++;
             lastLandingDistance = distance;
             
-            // 着地成功時：次の1000m区切りを更新
             nextRampTargetDistance = Math.ceil((distance + 800) / 1000) * 1000;
 
             feedbackText = `BIG JUMP #${jumpHistory.length}: +${lastJumpDist}m!`;
