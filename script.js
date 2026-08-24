@@ -407,7 +407,7 @@ function initBackButtonGuard() {
 
 
 // ========================================
-// 9. 操作入力 (連打カクツキ防止)
+// 9. 操作入力
 // ========================================
 
 function isInteractiveElement(target) {
@@ -439,7 +439,6 @@ function onPrimaryAction() {
                 player.vAir *= 0.5;
             }
 
-            // 連打によるAudioContextおよびパーティクル過負荷の防止 (120msのクールダウン)
             if (now - player.lastFlapTime > 120) {
                 sfx.playFlap();
                 createSnowSpray(player.slopeX - 5, getSlopeY(player.slopeX) - player.airOffset, 2);
@@ -497,7 +496,7 @@ function initInputHandlers() {
     window.addEventListener("mousedown", handleGlobalStart);
 
     window.addEventListener("keydown", (e) => {
-        if (e.repeat) return; // 長押し連続発火によるフリーズを防止
+        if (e.repeat) return;
 
         if (e.code === "Space") {
             sfx.unlock();
@@ -542,12 +541,12 @@ function getSlopeY(x) {
     return SLOPE_ORIGIN_Y + x * Math.tan(SLOPE_ANGLE);
 }
 
-const BASE_SPEED = 7.0; // 通常・大ジャンプ共通速度（一定速度でスクロール）
+const BASE_SPEED = 7.0; // 通常・大ジャンプ共通速度
 let speed = BASE_SPEED;
 
 let distance = 0;
 let totalJumpDistance = 0;
-let lastJumpDist = 0; // 直近（または現在ジャンプ中）の獲得ボーナス距離
+let lastJumpDist = 0; // 直近1回の獲得ボーナス距離
 let jumpHistory = [];
 let feedbackText = "";
 let feedbackTimer = 0;
@@ -556,8 +555,8 @@ let completedBigJumps = 0;
 let lastLandingDistance = 0;
 let nextRampTargetDistance = 1000;
 
-// 障害物出現の動的難易度調整用タイマー
-let spawnIntervalThreshold = 300;
+// 障害物出現のタイマーおよびしきい値
+let spawnIntervalThreshold = 350;
 
 const PLAYER_X = 200;
 const player = {
@@ -576,14 +575,14 @@ const player = {
     fallY: 0,
 
     lastFlapTime: 0,
-    jumpStartDist: 0 // ジャンプボーナスの完全同期計算用
+    jumpStartDist: 0
 };
 
 let particles = [];
 let obstacles = [];
 let spawnTimer = 0;
 
-const MAX_PARTICLES = 80; // 連打時の描画負荷オーバーガード
+const MAX_PARTICLES = 80;
 
 function createSnowSpray(x, y, count = 10) {
     if (particles.length >= MAX_PARTICLES) return;
@@ -615,9 +614,8 @@ function resetGame() {
     obstacles = [];
     particles = [];
     
-    // ゲーム開始直後は少し安全区間を置く
-    spawnTimer = -200; 
-    spawnIntervalThreshold = 300; 
+    spawnTimer = 0; 
+    spawnIntervalThreshold = 350; 
     
     completedBigJumps = 0;
     lastLandingDistance = 0;
@@ -647,68 +645,91 @@ function updateSpawns() {
 
     spawnTimer += speed;
 
-    // 1000mごとのジャンプ台（Ramp）生成
+    // ジャンプ台（1000m目標地点での出現）
     if (distance >= nextRampTargetDistance) {
         const spawnDist = 1100;
         obstacles.push({ type: "ramp", dist: spawnDist, w: 100, h: 45, triggered: false });
-        nextRampTargetDistance = 99999999; // ロック（画面外消滅時または着地時に解除）
+        nextRampTargetDistance = 99999999; // 出現済みロック
         spawnTimer = -250;
         return;
     }
 
-    // 走行距離に応じた頻度・ランダムゆらぎの生成（徐々に高密度＆ランダム波）
+    // 障害物生成タイマーチェック
     if (spawnTimer > spawnIntervalThreshold) {
         spawnTimer = 0;
 
-        // 距離が伸びるほど間隔が狭まり、ランダムな疎密の波をつける
-        if (distance < 300) {
-            // 序盤：間隔 40m〜70m 相当 (しきい値 320〜550)
+        // ★ ジャンプ成功回数（フェーズ）に応じた出現間隔（難易度）とランダムゆらぎ
+        if (completedBigJumps === 0) {
+            // フェーズ0：間隔 約40m〜70m (しきい値 320〜550)
             spawnIntervalThreshold = Math.floor(320 + Math.random() * 230);
-        } else if (distance < 800) {
-            // 初級：間隔 25m〜50m 相当 (しきい値 200〜400)
-            spawnIntervalThreshold = Math.floor(200 + Math.random() * 200);
-        } else if (distance < 1800) {
-            // 中級：間隔 15m〜35m 相当 (しきい値 120〜280)
-            spawnIntervalThreshold = Math.floor(120 + Math.random() * 160);
+        } else if (completedBigJumps === 1) {
+            // フェーズ1：間隔 約25m〜45m (しきい値 200〜360)
+            spawnIntervalThreshold = Math.floor(200 + Math.random() * 160);
+        } else if (completedBigJumps === 2) {
+            // フェーズ2：間隔 約18m〜35m (しきい値 140〜280)
+            spawnIntervalThreshold = Math.floor(140 + Math.random() * 140);
         } else {
-            // 上級：高密度＆不規則ラッシュ (しきい値 80〜200)
-            spawnIntervalThreshold = Math.floor(80 + Math.random() * 120);
+            // フェーズ3以降：間隔 約12m〜25m (しきい値 90〜200)
+            spawnIntervalThreshold = Math.floor(90 + Math.random() * 110);
         }
 
         const spawnDist = 1100;
+        
+        // 前回の着地点（またはスタート）からの相対距離
+        const relDist = distance - lastLandingDistance;
 
-        const canHole = distance >= 400;
-        const canTreeNormal = completedBigJumps >= 1 || distance >= 600;
-        const canSkier = (completedBigJumps >= 1 || distance >= 800) && (distance - lastLandingDistance >= 300);
-        const canTreeTall = completedBigJumps >= 2 || distance >= 1200;
-        const canHoleLandslide = (completedBigJumps >= 2 || distance >= 1500) && (distance - lastLandingDistance >= 300);
+        // 候補の決定（解禁ルールに厳密に準拠）
+        let candidates = [];
 
-        let candidates = ["snowman"];
+        if (completedBigJumps === 0) {
+            // 【フェーズ 0】
+            if (distance >= 100) candidates.push("snowman");
+            if (distance >= 500) candidates.push("hole");
+        } else if (completedBigJumps === 1) {
+            // 【フェーズ 1】 (直前着地後からの距離)
+            candidates.push("snowman");
+            candidates.push("hole");
+            if (relDist >= 100) candidates.push("tree_normal");
+            if (relDist >= 500) candidates.push("skier");
+        } else if (completedBigJumps === 2) {
+            // 【フェーズ 2】
+            candidates.push("snowman");
+            candidates.push("hole");
+            candidates.push("tree_normal");
+            candidates.push("skier");
+            if (relDist >= 100) candidates.push("tree_tall");
+            if (relDist >= 500) candidates.push("snowman_multi");
+        } else {
+            // 【フェーズ 3以降】
+            candidates.push("snowman");
+            candidates.push("hole");
+            candidates.push("tree_normal");
+            candidates.push("skier");
+            candidates.push("tree_tall");
+            candidates.push("snowman_multi");
+            if (relDist >= 100) candidates.push("hole_landslide");
+        }
 
-        if (distance >= 300 && Math.random() < 0.4) candidates.push("snowman_multi");
-        if (canHole) candidates.push("hole");
-        if (canTreeNormal) candidates.push("tree_normal");
-        if (canSkier) candidates.push("skier");
-        if (canTreeTall) candidates.push("tree_tall");
-        if (canHoleLandslide) candidates.push("hole_landslide");
+        // 該当条件を満たすギミックが存在する場合のみ生成
+        if (candidates.length > 0) {
+            const chosen = candidates[Math.floor(Math.random() * candidates.length)];
 
-        const chosen = candidates[Math.floor(Math.random() * candidates.length)];
-
-        if (chosen === "snowman") {
-            obstacles.push({ type: "snowman", dist: spawnDist, w: 38, h: 48 });
-        } else if (chosen === "snowman_multi") {
-            const snowCount = Math.random() < 0.6 ? 2 : 3;
-            for (let k = 0; k < snowCount; k++) {
-                obstacles.push({ type: "snowman", dist: spawnDist + (k * 42), w: 38, h: 48 });
+            if (chosen === "snowman") {
+                obstacles.push({ type: "snowman", dist: spawnDist, w: 38, h: 48 });
+            } else if (chosen === "snowman_multi") {
+                const snowCount = Math.random() < 0.6 ? 2 : 3;
+                for (let k = 0; k < snowCount; k++) {
+                    obstacles.push({ type: "snowman", dist: spawnDist + (k * 42), w: 38, h: 48 });
+                }
+            } else if (chosen === "hole" || chosen === "hole_landslide") {
+                obstacles.push(createHoleObstacle(spawnDist));
+            } else if (chosen === "tree_normal") {
+                obstacles.push({ type: "tree", dist: spawnDist, w: 48, h: 75, isTall: false });
+            } else if (chosen === "skier") {
+                obstacles.push({ type: "skier", dist: spawnDist, w: 40, h: 58, relSpeed: 2.0, falling: false, fallY: 0 });
+            } else if (chosen === "tree_tall") {
+                obstacles.push({ type: "tree", dist: spawnDist, w: 58, h: 110, isTall: true });
             }
-        } else if (chosen === "hole" || chosen === "hole_landslide") {
-            obstacles.push(createHoleObstacle(spawnDist));
-        } else if (chosen === "tree_normal") {
-            obstacles.push({ type: "tree", dist: spawnDist, w: 48, h: 75, isTall: false });
-        } else if (chosen === "skier") {
-            obstacles.push({ type: "skier", dist: spawnDist, w: 40, h: 58, relSpeed: 2.0, falling: false, fallY: 0 });
-        } else if (chosen === "tree_tall") {
-            obstacles.push({ type: "tree", dist: spawnDist, w: 58, h: 110, isTall: true });
         }
     }
 }
@@ -745,7 +766,6 @@ function update(dtMs) {
         setScore(Math.floor(distance));
 
         if (state === STATE.BIG_JUMPING) {
-            // 現在大ジャンプ中の飛距離（単体）を計算
             lastJumpDist = distance - player.jumpStartDist;
         }
 
@@ -819,6 +839,7 @@ function update(dtMs) {
             // 画面左端へ画面外消滅した場合の処理
             if (obs.dist < -200 || (obs.falling && obs.fallY > GAME_HEIGHT)) {
                 if (obs.type === "ramp") {
+                    // スルー時も次回ターゲット（着地点基準）を設定
                     nextRampTargetDistance = Math.ceil((distance + 800) / 1000) * 1000;
                 }
                 obstacles.splice(i, 1);
@@ -892,7 +913,6 @@ function update(dtMs) {
             createSnowSpray(player.slopeX, getSlopeY(player.slopeX), 20);
             sfx.playLanding();
 
-            // 獲得ボーナス距離を確定し、履歴および累計にのみ加算（HUDは確定直近値を保持表示）
             const landedJumpBonus = Math.floor(lastJumpDist);
             jumpHistory.push(landedJumpBonus);
             totalJumpDistance += landedJumpBonus;
@@ -900,7 +920,8 @@ function update(dtMs) {
             completedBigJumps++;
             lastLandingDistance = distance;
             
-            nextRampTargetDistance = Math.ceil((distance + 800) / 1000) * 1000;
+            // 次回のジャンプ台出現（着地点から1000m付近へターゲット更新）
+            nextRampTargetDistance = distance + 1000;
 
             feedbackText = `BIG JUMP #${jumpHistory.length}: +${landedJumpBonus}m!`;
             feedbackTimer = 60;
@@ -1026,7 +1047,7 @@ function render() {
         ctx.closePath();
         ctx.fill();
 
-        // 輪郭線は滑走面の曲線部分のみをストローク（垂直の縦線を描かない）
+        // 輪郭線は曲線の斜面部分のみ（垂直方向の線を引かない）
         ctx.beginPath();
         ctx.moveTo(x1, y1);
         ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x2, y2 - height);
