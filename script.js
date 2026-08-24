@@ -551,12 +551,10 @@ let jumpHistory = [];
 let feedbackText = "";
 let feedbackTimer = 0;
 
-let completedBigJumps = 0;
-let lastLandingDistance = 0;
-let nextRampTargetDistance = 1000;
+let nextRampTargetDistance = 1000; // 1回目は1000m、以降+2000m（3000m, 5000m...）
 
 // 障害物出現のタイマーおよびしきい値
-let spawnIntervalThreshold = 350;
+let spawnIntervalThreshold = 1600;
 
 const PLAYER_X = 200;
 const player = {
@@ -615,10 +613,8 @@ function resetGame() {
     particles = [];
     
     spawnTimer = 0; 
-    spawnIntervalThreshold = 350; 
+    spawnIntervalThreshold = 1600; // スタート時（1000m前）は200mに1回程度
     
-    completedBigJumps = 0;
-    lastLandingDistance = 0;
     nextRampTargetDistance = 1000;
 
     feedbackText = "";
@@ -645,72 +641,57 @@ function updateSpawns() {
 
     spawnTimer += speed;
 
-    // ジャンプ台（1000m目標地点での出現）
+    // ★ ジャンプ台出現判定（1回目:1000m, 2回目:3000m, 3回目:5000m, 5000m以降は+2000m毎）
     if (distance >= nextRampTargetDistance) {
         const spawnDist = 1100;
         obstacles.push({ type: "ramp", dist: spawnDist, w: 100, h: 45, triggered: false });
-        nextRampTargetDistance = 99999999; // 出現済みロック
+        
+        // 次回の目標距離を設定
+        if (nextRampTargetDistance === 1000) {
+            nextRampTargetDistance = 3000;
+        } else if (nextRampTargetDistance === 3000) {
+            nextRampTargetDistance = 5000;
+        } else {
+            nextRampTargetDistance += 2000; // 5000m以降は2000mごと
+        }
+        
         spawnTimer = -250;
         return;
     }
 
-    // 障害物生成タイマーチェック
+    // ★ 障害物生成タイマーチェック
     if (spawnTimer > spawnIntervalThreshold) {
         spawnTimer = 0;
 
-        // ★ ジャンプ成功回数（フェーズ）に応じた出現間隔（難易度）とランダムゆらぎ
-        if (completedBigJumps === 0) {
-            // フェーズ0：間隔 約40m〜70m (しきい値 320〜550)
-            spawnIntervalThreshold = Math.floor(320 + Math.random() * 230);
-        } else if (completedBigJumps === 1) {
-            // フェーズ1：間隔 約25m〜45m (しきい値 200〜360)
-            spawnIntervalThreshold = Math.floor(200 + Math.random() * 160);
-        } else if (completedBigJumps === 2) {
-            // フェーズ2：間隔 約18m〜35m (しきい値 140〜280)
-            spawnIntervalThreshold = Math.floor(140 + Math.random() * 140);
+        // ★ ジャンプ台出現区間（距離）に応じた難易度（間隔・ゆらぎ）の変化
+        if (distance < 1000) {
+            // 1台目ジャンプ台前（0m〜1000m）: 200mに1回程度（しきい値 1500〜1800）
+            spawnIntervalThreshold = Math.floor(1500 + Math.random() * 300);
+        } else if (distance < 3000) {
+            // 2台目ジャンプ台前（1000m〜3000m）: 約100m〜140mに1回（しきい値 800〜1100）
+            spawnIntervalThreshold = Math.floor(800 + Math.random() * 300);
+        } else if (distance < 5000) {
+            // 3台目ジャンプ台前（3000m〜5000m）: 約50m〜80mに1回（しきい値 400〜650）
+            spawnIntervalThreshold = Math.floor(400 + Math.random() * 250);
         } else {
-            // フェーズ3以降：間隔 約12m〜25m (しきい値 90〜200)
-            spawnIntervalThreshold = Math.floor(90 + Math.random() * 110);
+            // 5000m以降: 約25m〜40mに1回の高密度＆ランダム波（しきい値 200〜320）
+            spawnIntervalThreshold = Math.floor(200 + Math.random() * 120);
         }
 
         const spawnDist = 1100;
-        
-        // 前回の着地点（またはスタート）からの相対距離
-        const relDist = distance - lastLandingDistance;
 
-        // 候補の決定（解禁ルールに厳密に準拠）
+        // ★ ご指定いただいた解禁距離ルール（厳密準拠）
         let candidates = [];
 
-        if (completedBigJumps === 0) {
-            // 【フェーズ 0】
-            if (distance >= 100) candidates.push("snowman");
-            if (distance >= 500) candidates.push("hole");
-        } else if (completedBigJumps === 1) {
-            // 【フェーズ 1】 (直前着地後からの距離)
-            candidates.push("snowman");
-            candidates.push("hole");
-            if (relDist >= 100) candidates.push("tree_normal");
-            if (relDist >= 500) candidates.push("skier");
-        } else if (completedBigJumps === 2) {
-            // 【フェーズ 2】
-            candidates.push("snowman");
-            candidates.push("hole");
-            candidates.push("tree_normal");
-            candidates.push("skier");
-            if (relDist >= 100) candidates.push("tree_tall");
-            if (relDist >= 500) candidates.push("snowman_multi");
-        } else {
-            // 【フェーズ 3以降】
-            candidates.push("snowman");
-            candidates.push("hole");
-            candidates.push("tree_normal");
-            candidates.push("skier");
-            candidates.push("tree_tall");
-            candidates.push("snowman_multi");
-            if (relDist >= 100) candidates.push("hole_landslide");
-        }
+        if (distance >= 100) candidates.push("snowman");
+        if (distance >= 500) candidates.push("hole");
+        if (distance >= 1500) candidates.push("tree_normal");
+        if (distance >= 2500) candidates.push("skier");
+        if (distance >= 3500) candidates.push("tree_tall");
+        if (distance >= 4500) candidates.push("snowman_multi");
+        if (distance >= 5500) candidates.push("hole_landslide");
 
-        // 該当条件を満たすギミックが存在する場合のみ生成
+        // 該当するギミックが解禁されている場合のみランダム選出
         if (candidates.length > 0) {
             const chosen = candidates[Math.floor(Math.random() * candidates.length)];
 
@@ -838,10 +819,6 @@ function update(dtMs) {
 
             // 画面左端へ画面外消滅した場合の処理
             if (obs.dist < -200 || (obs.falling && obs.fallY > GAME_HEIGHT)) {
-                if (obs.type === "ramp") {
-                    // スルー時も次回ターゲット（着地点基準）を設定
-                    nextRampTargetDistance = Math.ceil((distance + 800) / 1000) * 1000;
-                }
                 obstacles.splice(i, 1);
             }
         }
@@ -916,12 +893,6 @@ function update(dtMs) {
             const landedJumpBonus = Math.floor(lastJumpDist);
             jumpHistory.push(landedJumpBonus);
             totalJumpDistance += landedJumpBonus;
-
-            completedBigJumps++;
-            lastLandingDistance = distance;
-            
-            // 次回のジャンプ台出現（着地点から1000m付近へターゲット更新）
-            nextRampTargetDistance = distance + 1000;
 
             feedbackText = `BIG JUMP #${jumpHistory.length}: +${landedJumpBonus}m!`;
             feedbackTimer = 60;
