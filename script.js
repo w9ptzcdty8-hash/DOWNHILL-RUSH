@@ -666,7 +666,7 @@ function updateSpawns() {
         // ★ 滑走1000mごとに段階的に間隔を縮小（難易度アップ＆ゆらぎ）
         if (distance < 500) {
             // 0m〜1000m: 約150mに1回（しきい値 1000〜1300）
-            spawnIntervalThreshold = Math.floor(600 + Math.random() * 600);
+            spawnIntervalThreshold = Math.floor(600 + Math.random() * 500);
         } else if (distance < 1000) {
             // 1000m〜2000m: 約110mに1回（しきい値 750〜1000）
             spawnIntervalThreshold = Math.floor(400 + Math.random() * 600);
@@ -681,10 +681,10 @@ function updateSpawns() {
             spawnIntervalThreshold = Math.floor(200 + Math.random() * 500);
         } else if (distance < 5000) {
             // 4000m〜5000m: 約35mに1回（しきい値 240〜380）
-            spawnIntervalThreshold = Math.floor(200 + Math.random() * 400);
+            spawnIntervalThreshold = Math.floor(200 + Math.random() * 300);
         } else {
             // 5000m以降: 約20m〜30mに1回の高密度ラッシュ（しきい値 140〜240）
-            spawnIntervalThreshold = Math.floor(200 + Math.random() * 300);
+            spawnIntervalThreshold = Math.floor(150 + Math.random() * 300);
         }
 
         const spawnDist = 1100;
