@@ -429,7 +429,7 @@ function onPrimaryAction() {
             player.lastFlapTime = now;
             
             sfx.playJump();
-            createSnowSpray(player.slopeX, getSlopeY(player.slopeX), 8);
+            createSnowSpray(player.slopeX, getSlopeY(player.slopeX), 6);
         } else {
             // 空中での羽ばたき
             player.slowFallTicks = 16;
@@ -456,7 +456,7 @@ function onPrimaryAction() {
 
         if (now - player.lastFlapTime > 120) {
             sfx.playFlap();
-            createSnowSpray(player.slopeX - 5, getSlopeY(player.slopeX) - player.airOffset, 3);
+            createSnowSpray(player.slopeX - 5, getSlopeY(player.slopeX) - player.airOffset, 2);
             player.lastFlapTime = now;
         }
     }
@@ -580,7 +580,7 @@ let particles = [];
 let obstacles = [];
 let spawnTimer = 0;
 
-const MAX_PARTICLES = 80;
+const MAX_PARTICLES = 40; // 描画負荷軽減のため最適化上限調整
 
 function createSnowSpray(x, y, count = 10) {
     if (particles.length >= MAX_PARTICLES) return;
@@ -590,10 +590,10 @@ function createSnowSpray(x, y, count = 10) {
         particles.push({
             x: x,
             y: y,
-            vx: (Math.random() - 0.5) * 5 - speed * 0.3 * SLOPE_COS,
-            vy: (Math.random() - 0.5) * 5 - speed * 0.3 * SLOPE_SIN,
+            vx: (Math.random() - 0.5) * 4 - speed * 0.2 * SLOPE_COS,
+            vy: (Math.random() - 0.5) * 4 - speed * 0.2 * SLOPE_SIN,
             life: 1.0,
-            size: Math.random() * 4 + 2
+            size: Math.random() * 3 + 2
         });
     }
 }
@@ -857,7 +857,7 @@ function update(dtMs) {
             player.airOffset -= player.vAir;
 
             if (player.airOffset <= 0) {
-                createSnowSpray(player.slopeX, getSlopeY(player.slopeX), 12);
+                createSnowSpray(player.slopeX, getSlopeY(player.slopeX), 8);
                 sfx.playLanding();
                 player.airOffset = 0;
                 player.vAir = 0;
@@ -865,8 +865,8 @@ function update(dtMs) {
                 player.slowFallTicks = 0;
             }
         } else {
-            if (Math.random() < 0.4) {
-                createSnowSpray(player.slopeX - 10, getSlopeY(player.slopeX), 2);
+            if (Math.random() < 0.3) {
+                createSnowSpray(player.slopeX - 10, getSlopeY(player.slopeX), 1);
             }
         }
 
@@ -893,7 +893,7 @@ function update(dtMs) {
             player.vAir = 0;
             state = STATE.PLAYING;
 
-            createSnowSpray(player.slopeX, getSlopeY(player.slopeX), 20);
+            createSnowSpray(player.slopeX, getSlopeY(player.slopeX), 12);
             sfx.playLanding();
 
             const landedJumpBonus = Math.floor(lastJumpDist);
@@ -915,14 +915,14 @@ function updateParticles() {
         let p = particles[i];
         p.x += p.vx;
         p.y += p.vy;
-        p.life -= 0.03;
+        p.life -= 0.04;
         if (p.life <= 0) particles.splice(i, 1);
     }
 }
 
 
 // ========================================
-// 11. 描画処理
+// 11. 描画処理 (軽量化＆線消去)
 // ========================================
 
 const skyGrad = ctx.createLinearGradient(0, 0, GAME_WIDTH, GAME_HEIGHT);
@@ -984,6 +984,7 @@ function render() {
         const y1 = getSlopeY(x1);
         const y2 = getSlopeY(x2);
 
+        // 地面内部の塗りつぶし
         ctx.beginPath();
         ctx.moveTo(x1, y1);
         ctx.lineTo(x2, y2);
@@ -992,11 +993,10 @@ function render() {
         ctx.closePath();
         ctx.fill();
 
+        // 表面の斜面ラインのみ線を描画（地面の下へ向かう垂直な縦線を消去）
         ctx.beginPath();
         ctx.moveTo(x1, y1);
-        ctx.lineTo(x1, GAME_HEIGHT + 100);
-        ctx.moveTo(x2, y2);
-        ctx.lineTo(x2, GAME_HEIGHT + 100);
+        ctx.lineTo(x2, y2);
         ctx.stroke();
 
         ctx.fillStyle = "rgba(150, 180, 200, 0.15)";
@@ -1024,7 +1024,7 @@ function render() {
         ctx.closePath();
         ctx.fill();
 
-        // 輪郭線は曲線の斜面部分のみ（垂直方向の線を引かない）
+        // 輪郭線は曲線の斜面部分のみ（ジャンプ台真下の垂直な縦線を完全除去）
         ctx.beginPath();
         ctx.moveTo(x1, y1);
         ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x2, y2 - height);
@@ -1047,7 +1047,7 @@ function render() {
         }
     }
 
-    // 障害物描画
+    // 障害物描画（描画状態変更の最適化で軽量化）
     sortedObs.forEach(obs => {
         if (obs.type === "hole" || obs.type === "ramp") return;
 
@@ -1061,8 +1061,10 @@ function render() {
         if (obs.type === "tree") {
             const trunkW = obs.isTall ? 10 : 8;
             const trunkH = obs.isTall ? 18 : 14;
+            // 幹
             ctx.fillStyle = "#5d4037";
             ctx.fillRect(-trunkW / 2, -trunkH, trunkW, trunkH);
+            // 葉（パス描画の軽量化）
             ctx.fillStyle = obs.isTall ? "#1b5e20" : "#2e7d32";
             ctx.beginPath();
             ctx.moveTo(-obs.w / 2, -trunkH);
@@ -1073,8 +1075,6 @@ function render() {
             ctx.fillStyle = "#e0f7fa";
             ctx.beginPath();
             ctx.arc(0, -14, 15, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
             ctx.arc(0, -34, 10, 0, Math.PI * 2);
             ctx.fill();
             ctx.fillStyle = "#ff6d00";
@@ -1106,12 +1106,10 @@ function render() {
         ctx.restore();
     });
 
-    // 雪パーティクル
+    // 雪パーティクル描画
     particles.forEach(p => {
         ctx.fillStyle = `rgba(255, 255, 255, ${p.life})`;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size); // arcから軽量なfillRectに変更
     });
 
     // プレイヤー描画
