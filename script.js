@@ -598,9 +598,15 @@ function createSnowSpray(x, y, count = 10) {
     }
 }
 
-function createHoleObstacle(spawnDist) {
+function createHoleObstacle(spawnDist, isLandslide = false) {
     const holeWidth = 70 + Math.random() * 35;
-    return { type: "hole", dist: spawnDist, w: holeWidth };
+    return { 
+        type: "hole", 
+        dist: spawnDist, 
+        w: holeWidth, 
+        isLandslide: isLandslide, 
+        opened: !isLandslide // 通常の穴は最初から開いている。地すべり穴は開いていない
+    };
 }
 
 function resetGame() {
@@ -665,31 +671,24 @@ function updateSpawns() {
 
         // ★ 滑走1000mごとに段階的に間隔を縮小（難易度アップ＆ゆらぎ）
         if (distance < 500) {
-            // 0m〜1000m: 約150mに1回（しきい値 1000〜1300）
             spawnIntervalThreshold = Math.floor(600 + Math.random() * 500);
         } else if (distance < 1000) {
-            // 1000m〜2000m: 約110mに1回（しきい値 750〜1000）
             spawnIntervalThreshold = Math.floor(400 + Math.random() * 600);
         } else if (distance < 2000) {
-            // 1000m〜2000m: 約110mに1回（しきい値 750〜1000）
             spawnIntervalThreshold = Math.floor(300 + Math.random() * 600);
         } else if (distance < 3000) {
-            // 2000m〜3000m: 約80mに1回（しきい値 550〜750）
             spawnIntervalThreshold = Math.floor(300 + Math.random() * 500);
         } else if (distance < 4000) {
-            // 3000m〜4000m: 約55mに1回（しきい値 380〜550）
             spawnIntervalThreshold = Math.floor(200 + Math.random() * 500);
         } else if (distance < 5000) {
-            // 4000m〜5000m: 約35mに1回（しきい値 240〜380）
             spawnIntervalThreshold = Math.floor(200 + Math.random() * 300);
         } else {
-            // 5000m以降: 約20m〜30mに1回の高密度ラッシュ（しきい値 140〜240）
             spawnIntervalThreshold = Math.floor(150 + Math.random() * 300);
         }
 
         const spawnDist = 1100;
 
-        // ★ ご指定いただいた解禁距離ルール（厳密準拠）
+        // ★ 解禁距離ルール
         let candidates = [];
 
         if (distance >= 50) candidates.push("snowman");
@@ -711,8 +710,10 @@ function updateSpawns() {
                 for (let k = 0; k < snowCount; k++) {
                     obstacles.push({ type: "snowman", dist: spawnDist + (k * 42), w: 38, h: 48 });
                 }
-            } else if (chosen === "hole" || chosen === "hole_landslide") {
-                obstacles.push(createHoleObstacle(spawnDist));
+            } else if (chosen === "hole") {
+                obstacles.push(createHoleObstacle(spawnDist, false));
+            } else if (chosen === "hole_landslide") {
+                obstacles.push(createHoleObstacle(spawnDist, true)); // 地すべり穴フラグを有効化
             } else if (chosen === "tree_normal") {
                 obstacles.push({ type: "tree", dist: spawnDist, w: 48, h: 75, isTall: false });
             } else if (chosen === "skier") {
@@ -764,7 +765,7 @@ function update(dtMs) {
 
         updateSpawns();
 
-        const holes = obstacles.filter(o => o.type === "hole");
+        const holes = obstacles.filter(o => o.type === "hole" && o.opened);
 
         for (let i = obstacles.length - 1; i >= 0; i--) {
             let obs = obstacles[i];
@@ -793,7 +794,15 @@ function update(dtMs) {
             const ox = obs.dist;
             const px = player.slopeX;
 
-            if (!player.isFallingInHole && obs.type === "hole") {
+            // 地すべり穴のオープン判定（プレイヤーが250px手前に近づいたら開く）
+            if (obs.type === "hole" && obs.isLandslide && !obs.opened) {
+                if (ox - px <= 250) {
+                    obs.opened = true;
+                    createSnowSpray(ox, getSlopeY(ox), 10);
+                }
+            }
+
+            if (!player.isFallingInHole && obs.type === "hole" && obs.opened) {
                 const holeLeft = ox - obs.w * 0.35;
                 const holeRight = ox + obs.w * 0.35;
 
@@ -958,7 +967,7 @@ function render() {
     let currentX = -100;
 
     sortedObs.forEach(obs => {
-        if (obs.type === "hole") {
+        if (obs.type === "hole" && obs.opened) {
             const hLeft = obs.dist - obs.w / 2;
             const hRight = obs.dist + obs.w / 2;
 
@@ -996,7 +1005,7 @@ function render() {
         ctx.closePath();
         ctx.fill();
 
-        // 表面の斜面ラインのみ線を描画（地面の下へ向かう垂直な縦線を消去）
+        // 表面の斜面ラインのみ線を描画
         ctx.beginPath();
         ctx.moveTo(x1, y1);
         ctx.lineTo(x2, y2);
@@ -1027,7 +1036,7 @@ function render() {
         ctx.closePath();
         ctx.fill();
 
-        // 輪郭線は曲線の斜面部分のみ（ジャンプ台真下の垂直な縦線を完全除去）
+        // 輪郭線は曲線の斜面部分のみ
         ctx.beginPath();
         ctx.moveTo(x1, y1);
         ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x2, y2 - height);
@@ -1050,9 +1059,9 @@ function render() {
         }
     }
 
-    // 障害物描画（描画状態変更の最適化で軽量化）
+    // 障害物描画
     sortedObs.forEach(obs => {
-        if (obs.type === "hole" || obs.type === "ramp") return;
+        if ((obs.type === "hole" && obs.opened) || obs.type === "ramp") return;
 
         const ox = obs.dist;
         const oy = getSlopeY(ox) + (obs.falling ? obs.fallY : 0);
@@ -1061,13 +1070,23 @@ function render() {
         ctx.translate(ox, oy);
         ctx.rotate(SLOPE_ANGLE + (obs.falling ? 0.4 : 0));
 
-        if (obs.type === "tree") {
+        // 地すべり穴が開く前のうっすらとした境界（亀裂）ラインの描画
+        if (obs.type === "hole" && obs.isLandslide && !obs.opened) {
+            ctx.strokeStyle = "rgba(180, 50, 50, 0.4)";
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 4]); // 破線
+            ctx.beginPath();
+            ctx.moveTo(-obs.w / 2, 0);
+            ctx.lineTo(obs.w / 2, 0);
+            ctx.stroke();
+            ctx.setLineDash([]); // 破線リセット
+        } else if (obs.type === "tree") {
             const trunkW = obs.isTall ? 10 : 8;
             const trunkH = obs.isTall ? 18 : 14;
             // 幹
             ctx.fillStyle = "#5d4037";
             ctx.fillRect(-trunkW / 2, -trunkH, trunkW, trunkH);
-            // 葉（パス描画の軽量化）
+            // 葉
             ctx.fillStyle = obs.isTall ? "#1b5e20" : "#2e7d32";
             ctx.beginPath();
             ctx.moveTo(-obs.w / 2, -trunkH);
@@ -1112,7 +1131,7 @@ function render() {
     // 雪パーティクル描画
     particles.forEach(p => {
         ctx.fillStyle = `rgba(255, 255, 255, ${p.life})`;
-        ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size); // arcから軽量なfillRectに変更
+        ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
     });
 
     // プレイヤー描画
