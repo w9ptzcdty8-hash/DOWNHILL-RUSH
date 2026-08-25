@@ -349,16 +349,16 @@ function endGame() {
     state = STATE.GAMEOVER;
     sfx.playCrash();
 
-    // NEW HIGH SCOREバッジを一旦確実に非表示化
-    gameoverNewrecordEl.classList.add("hidden");
-
     const currentTotalScore = Math.floor(distance) + totalJumpDistance;
     const isNewHighScore = currentTotalScore > 0 && currentTotalScore > highScoreData.totalScore;
 
+    // style.display で確実に表示・非表示を切替
     if (isNewHighScore) {
         saveHighScore(currentTotalScore, Math.floor(distance), totalJumpDistance);
         sfx.playNewRecord();
-        gameoverNewrecordEl.classList.remove("hidden");
+        gameoverNewrecordEl.style.display = "block";
+    } else {
+        gameoverNewrecordEl.style.display = "none";
     }
 
     goDistValEl.innerText = `${Math.floor(distance)}m`;
@@ -1126,7 +1126,7 @@ function render() {
         if (obs.type === "hole" && obs.isLandslide && !obs.opened) {
             ctx.strokeStyle = "rgba(180, 50, 50, 0.45)";
             ctx.lineWidth = 2;
-            ctx.setLineDash([4, 4]); // 破線
+            ctx.setLineDash([4, 4]);
             ctx.beginPath();
             ctx.moveTo(-obs.w / 2, 0);
             ctx.lineTo(obs.w / 2, 0);
@@ -1146,14 +1146,23 @@ function render() {
             ctx.lineTo(obs.w / 2, -trunkH);
             ctx.fill();
         } else if (obs.type === "snowman") {
-            ctx.fillStyle = obs.isWalking ? "#b2ebf2" : "#e0f7fa";
+            // 普通の雪だるまと同じ色・見た目
+            ctx.fillStyle = "#e0f7fa";
             ctx.beginPath();
             ctx.arc(0, -14, 15, 0, Math.PI * 2);
             ctx.arc(0, -34, 10, 0, Math.PI * 2);
             ctx.fill();
+
+            // 鼻（歩く雪だるまは左向き、通常は右向き）
             ctx.fillStyle = "#ff6d00";
-            ctx.fillRect(2, -36, 8, 3);
-            ctx.fillStyle = obs.isWalking ? "#d50000" : "#263238"; // 歩く雪だるまは帽子が赤色
+            if (obs.isWalking) {
+                ctx.fillRect(-10, -36, 8, 3); // 左向きの鼻
+            } else {
+                ctx.fillRect(2, -36, 8, 3);  // 右向きの鼻
+            }
+
+            // 帽子（普通の雪だるまと同じ黒色）
+            ctx.fillStyle = "#263238";
             ctx.fillRect(-8, -44, 16, 3);
             ctx.fillRect(-5, -52, 10, 8);
         } else if (obs.type === "skier") {
