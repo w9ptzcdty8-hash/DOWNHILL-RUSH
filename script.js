@@ -554,7 +554,7 @@ let feedbackTimer = 0;
 let nextRampTargetDistance = 1000; // 1回目は1000m、以降+2000m（3000m, 5000m...）
 
 // 障害物出現のタイマーおよびしきい値
-let spawnIntervalThreshold = 1600;
+let spawnIntervalThreshold = 1100;
 
 const PLAYER_X = 200;
 const player = {
@@ -613,7 +613,7 @@ function resetGame() {
     particles = [];
     
     spawnTimer = 0; 
-    spawnIntervalThreshold = 1600; // スタート時（1000m前）は200mに1回程度
+    spawnIntervalThreshold = 1100; // 最初は150mに1回程度（しきい値 1000〜1300）
     
     nextRampTargetDistance = 1000;
 
@@ -663,19 +663,25 @@ function updateSpawns() {
     if (spawnTimer > spawnIntervalThreshold) {
         spawnTimer = 0;
 
-        // ★ ジャンプ台出現区間（距離）に応じた難易度（間隔・ゆらぎ）の変化
+        // ★ 滑走1000mごとに段階的に間隔を縮小（難易度アップ＆ゆらぎ）
         if (distance < 1000) {
-            // 1台目ジャンプ台前（0m〜1000m）: 200mに1回程度（しきい値 1500〜1800）
-            spawnIntervalThreshold = Math.floor(1500 + Math.random() * 300);
+            // 0m〜1000m: 約150mに1回（しきい値 1000〜1300）
+            spawnIntervalThreshold = Math.floor(1000 + Math.random() * 300);
+        } else if (distance < 2000) {
+            // 1000m〜2000m: 約110mに1回（しきい値 750〜1000）
+            spawnIntervalThreshold = Math.floor(750 + Math.random() * 250);
         } else if (distance < 3000) {
-            // 2台目ジャンプ台前（1000m〜3000m）: 約100m〜140mに1回（しきい値 800〜1100）
-            spawnIntervalThreshold = Math.floor(800 + Math.random() * 300);
+            // 2000m〜3000m: 約80mに1回（しきい値 550〜750）
+            spawnIntervalThreshold = Math.floor(550 + Math.random() * 200);
+        } else if (distance < 4000) {
+            // 3000m〜4000m: 約55mに1回（しきい値 380〜550）
+            spawnIntervalThreshold = Math.floor(380 + Math.random() * 170);
         } else if (distance < 5000) {
-            // 3台目ジャンプ台前（3000m〜5000m）: 約50m〜80mに1回（しきい値 400〜650）
-            spawnIntervalThreshold = Math.floor(400 + Math.random() * 250);
+            // 4000m〜5000m: 約35mに1回（しきい値 240〜380）
+            spawnIntervalThreshold = Math.floor(240 + Math.random() * 140);
         } else {
-            // 5000m以降: 約25m〜40mに1回の高密度＆ランダム波（しきい値 200〜320）
-            spawnIntervalThreshold = Math.floor(200 + Math.random() * 120);
+            // 5000m以降: 約20m〜30mに1回の高密度ラッシュ（しきい値 140〜240）
+            spawnIntervalThreshold = Math.floor(140 + Math.random() * 100);
         }
 
         const spawnDist = 1100;
