@@ -276,7 +276,10 @@ let highScoreData = {
 
 function loadHighScore() {
     try {
-        if (window.mySkiHighScore) {
+        const saved = localStorage.getItem("mySkiHighScore");
+        if (saved) {
+            highScoreData = JSON.parse(saved);
+        } else if (window.mySkiHighScore) {
             highScoreData = window.mySkiHighScore;
         }
     } catch(e) {}
@@ -291,6 +294,7 @@ function saveHighScore(total, dist, jump) {
     };
     try {
         window.mySkiHighScore = highScoreData;
+        localStorage.setItem("mySkiHighScore", JSON.stringify(highScoreData));
     } catch(e) {}
     updateHighScoreUI();
 }
@@ -345,15 +349,16 @@ function endGame() {
     state = STATE.GAMEOVER;
     sfx.playCrash();
 
+    // NEW HIGH SCOREバッジを一旦確実に非表示化
+    gameoverNewrecordEl.classList.add("hidden");
+
     const currentTotalScore = Math.floor(distance) + totalJumpDistance;
-    const isNewHighScore = currentTotalScore > highScoreData.totalScore;
+    const isNewHighScore = currentTotalScore > 0 && currentTotalScore > highScoreData.totalScore;
 
     if (isNewHighScore) {
         saveHighScore(currentTotalScore, Math.floor(distance), totalJumpDistance);
         sfx.playNewRecord();
         gameoverNewrecordEl.classList.remove("hidden");
-    } else {
-        gameoverNewrecordEl.classList.add("hidden");
     }
 
     goDistValEl.innerText = `${Math.floor(distance)}m`;
@@ -605,7 +610,8 @@ function createHoleObstacle(spawnDist, isLandslide = false) {
         dist: spawnDist, 
         w: holeWidth, 
         isLandslide: isLandslide, 
-        opened: !isLandslide // 通常の穴は最初から開いている。地すべり穴は開いていない
+        opened: !isLandslide, // 通常の穴は最初から開いている。地すべり穴は開いていない
+        collapseY: 0          // 地すべり崩落アニメーション用オフセット
     };
 }
 
@@ -698,22 +704,30 @@ function updateSpawns() {
         if (distance >= 3500) candidates.push("tree_tall");
         if (distance >= 4500) candidates.push("snowman_multi");
         if (distance >= 5500) candidates.push("hole_landslide");
+        
+        // 3000m以降ごく稀に「歩く雪だるま」を追加
+        if (distance >= 3000 && Math.random() < 0.25) {
+            candidates.push("walking_snowman");
+        }
 
         // 該当するギミックが解禁されている場合のみランダム選出
         if (candidates.length > 0) {
             const chosen = candidates[Math.floor(Math.random() * candidates.length)];
 
             if (chosen === "snowman") {
-                obstacles.push({ type: "snowman", dist: spawnDist, w: 38, h: 48 });
+                obstacles.push({ type: "snowman", dist: spawnDist, w: 38, h: 48, isWalking: false });
+            } else if (chosen === "walking_snowman") {
+                // ゆっくり歩く雪だるま
+                obstacles.push({ type: "snowman", dist: spawnDist, w: 38, h: 48, isWalking: true, walkSpeed: 0.8 });
             } else if (chosen === "snowman_multi") {
                 const snowCount = Math.random() < 0.6 ? 2 : 3;
                 for (let k = 0; k < snowCount; k++) {
-                    obstacles.push({ type: "snowman", dist: spawnDist + (k * 42), w: 38, h: 48 });
+                    obstacles.push({ type: "snowman", dist: spawnDist + (k * 42), w: 38, h: 48, isWalking: false });
                 }
             } else if (chosen === "hole") {
                 obstacles.push(createHoleObstacle(spawnDist, false));
             } else if (chosen === "hole_landslide") {
-                obstacles.push(createHoleObstacle(spawnDist, true)); // 地すべり穴フラグを有効化
+                obstacles.push(createHoleObstacle(spawnDist, true));
             } else if (chosen === "tree_normal") {
                 obstacles.push({ type: "tree", dist: spawnDist, w: 48, h: 75, isTall: false });
             } else if (chosen === "skier") {
@@ -787,6 +801,9 @@ function update(dtMs) {
                     obs.fallY += 10;
                     obs.dist -= speed * 0.5;
                 }
+            } else if (obs.type === "snowman" && obs.isWalking) {
+                // 歩く雪だるま：プレイヤーに向かってゆっくり進む
+                obs.dist -= (speed + obs.walkSpeed);
             } else {
                 obs.dist -= speed;
             }
@@ -794,15 +811,20 @@ function update(dtMs) {
             const ox = obs.dist;
             const px = player.slopeX;
 
-            // 地すべり穴のオープン判定（プレイヤーが250px手前に近づいたら開く）
-            if (obs.type === "hole" && obs.isLandslide && !obs.opened) {
-                if (ox - px <= 250) {
+            // 地すべり穴のアニメーション＆オープン判定（手前250pxで下へ崩落開始）
+            if (obs.type === "hole" && obs.isLandslide) {
+                if (ox - px <= 250 && obs.collapseY === 0) {
                     obs.opened = true;
-                    createSnowSpray(ox, getSlopeY(ox), 10);
+                    createSnowSpray(ox, getSlopeY(ox), 12);
+                }
+
+                // 崩落アニメーション更新
+                if (obs.opened && obs.collapseY < 80) {
+                    obs.collapseY += 3.5;
                 }
             }
 
-            if (!player.isFallingInHole && obs.type === "hole" && obs.opened) {
+            if (!player.isFallingInHole && obs.type === "hole" && obs.opened && obs.collapseY > 15) {
                 const holeLeft = ox - obs.w * 0.35;
                 const holeRight = ox + obs.w * 0.35;
 
@@ -934,7 +956,7 @@ function updateParticles() {
 
 
 // ========================================
-// 11. 描画処理 (軽量化＆線消去)
+// 11. 描画処理
 // ========================================
 
 const skyGrad = ctx.createLinearGradient(0, 0, GAME_WIDTH, GAME_HEIGHT);
@@ -974,6 +996,12 @@ function render() {
             if (hLeft > currentX) {
                 drawSlopeBlock(currentX, hLeft);
             }
+
+            // 地すべり崩落中の雪塊ブロックを下へ描画
+            if (obs.isLandslide && obs.collapseY < 75) {
+                drawCollapsingBlock(hLeft, hRight, obs.collapseY);
+            }
+
             currentX = Math.max(currentX, hRight);
 
         } else if (obs.type === "ramp") {
@@ -1015,6 +1043,27 @@ function render() {
         ctx.fillRect(x1, y1 + 5, 4, GAME_HEIGHT);
         ctx.fillRect(x2 - 4, y2 + 5, 4, GAME_HEIGHT);
         ctx.fillStyle = "#ffffff";
+    }
+
+    // 地すべり崩落中の雪塊の描画
+    function drawCollapsingBlock(x1, x2, offsetY) {
+        const y1 = getSlopeY(x1) + offsetY;
+        const y2 = getSlopeY(x2) + offsetY;
+
+        ctx.save();
+        ctx.fillStyle = "#e0f2fe";
+        ctx.strokeStyle = "#94a3b8";
+        ctx.lineWidth = 1.5;
+
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.lineTo(x2, y2 + 35);
+        ctx.lineTo(x1, y1 + 35);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
     }
 
     function drawRampBlock(x1, x2, height) {
@@ -1068,18 +1117,21 @@ function render() {
 
         ctx.save();
         ctx.translate(ox, oy);
-        ctx.rotate(SLOPE_ANGLE + (obs.falling ? 0.4 : 0));
+
+        // 歩く雪だるまの場合はヨチヨチ揺れを加える
+        const walkWobble = (obs.type === "snowman" && obs.isWalking) ? Math.sin(Date.now() * 0.015) * 0.18 : 0;
+        ctx.rotate(SLOPE_ANGLE + (obs.falling ? 0.4 : walkWobble));
 
         // 地すべり穴が開く前のうっすらとした境界（亀裂）ラインの描画
         if (obs.type === "hole" && obs.isLandslide && !obs.opened) {
-            ctx.strokeStyle = "rgba(180, 50, 50, 0.4)";
+            ctx.strokeStyle = "rgba(180, 50, 50, 0.45)";
             ctx.lineWidth = 2;
             ctx.setLineDash([4, 4]); // 破線
             ctx.beginPath();
             ctx.moveTo(-obs.w / 2, 0);
             ctx.lineTo(obs.w / 2, 0);
             ctx.stroke();
-            ctx.setLineDash([]); // 破線リセット
+            ctx.setLineDash([]);
         } else if (obs.type === "tree") {
             const trunkW = obs.isTall ? 10 : 8;
             const trunkH = obs.isTall ? 18 : 14;
@@ -1094,14 +1146,14 @@ function render() {
             ctx.lineTo(obs.w / 2, -trunkH);
             ctx.fill();
         } else if (obs.type === "snowman") {
-            ctx.fillStyle = "#e0f7fa";
+            ctx.fillStyle = obs.isWalking ? "#b2ebf2" : "#e0f7fa";
             ctx.beginPath();
             ctx.arc(0, -14, 15, 0, Math.PI * 2);
             ctx.arc(0, -34, 10, 0, Math.PI * 2);
             ctx.fill();
             ctx.fillStyle = "#ff6d00";
             ctx.fillRect(2, -36, 8, 3);
-            ctx.fillStyle = "#263238";
+            ctx.fillStyle = obs.isWalking ? "#d50000" : "#263238"; // 歩く雪だるまは帽子が赤色
             ctx.fillRect(-8, -44, 16, 3);
             ctx.fillRect(-5, -52, 10, 8);
         } else if (obs.type === "skier") {
