@@ -681,9 +681,9 @@ function updateSpawns() {
         } else if (distance < 1000) {
             spawnIntervalThreshold = Math.floor(400 + Math.random() * 500);
         } else if (distance < 2000) {
-            spawnIntervalThreshold = Math.floor(300 + Math.random() * 500);
+            spawnIntervalThreshold = Math.floor(200 + Math.random() * 500);
         } else if (distance < 3000) {
-            spawnIntervalThreshold = Math.floor(300 + Math.random() * 400);
+            spawnIntervalThreshold = Math.floor(200 + Math.random() * 400);
         } else if (distance < 4000) {
             spawnIntervalThreshold = Math.floor(200 + Math.random() * 300);
         } else if (distance < 5000) {
@@ -707,8 +707,8 @@ function updateSpawns() {
         if (distance >= 4000) candidates.push("snowman_multi");
         if (distance >= 5500) candidates.push("hole_landslide");
 
-        // 6000m以降、ごく稀に「大穴（huge_hole）」を追加
-        if (distance >= 6000 && Math.random() < 0.15) {
+        // 6000m以降、ごく稀に「大穴（huge_hole）」を追加、デフォしきい値0.15
+        if (distance >= 1000 && Math.random() < 0.5) {
             candidates.push("huge_hole");
         }
         
