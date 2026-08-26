@@ -725,7 +725,7 @@ function updateSpawns() {
                 obstacles.push({ type: "snowman", dist: spawnDist, w: 38, h: 48, isWalking: false });
             } else if (chosen === "walking_snowman") {
                 // ゆっくり歩く雪だるま
-                obstacles.push({ type: "snowman", dist: spawnDist, w: 38, h: 48, isWalking: true, walkSpeed: 0.8 });
+                obstacles.push({ type: "snowman", dist: spawnDist, w: 38, h: 48, isWalking: true, walkSpeed: 1.0 });
             } else if (chosen === "snowman_multi") {
                 const snowCount = Math.random() < 0.6 ? 2 : 3;
                 for (let k = 0; k < snowCount; k++) {
