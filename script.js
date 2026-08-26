@@ -708,7 +708,7 @@ function updateSpawns() {
         if (distance >= 5500) candidates.push("hole_landslide");
 
         // 6000m以降、ごく稀に「大穴（huge_hole）」を追加、デフォしきい値0.15
-        if (distance >= 1000 && Math.random() < 0.5) {
+        if (distance >= 3000 && Math.random() < 0.25) {
             candidates.push("huge_hole");
         }
         
