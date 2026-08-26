@@ -677,17 +677,17 @@ function updateSpawns() {
 
         // ★ 滑走1000mごとに段階的に間隔を縮小（難易度アップ＆ゆらぎ）
         if (distance < 500) {
-            spawnIntervalThreshold = Math.floor(600 + Math.random() * 500);
+            spawnIntervalThreshold = Math.floor(400 + Math.random() * 500);
         } else if (distance < 1000) {
-            spawnIntervalThreshold = Math.floor(400 + Math.random() * 600);
-        } else if (distance < 2000) {
-            spawnIntervalThreshold = Math.floor(300 + Math.random() * 600);
-        } else if (distance < 3000) {
             spawnIntervalThreshold = Math.floor(300 + Math.random() * 500);
-        } else if (distance < 4000) {
+        } else if (distance < 2000) {
             spawnIntervalThreshold = Math.floor(200 + Math.random() * 500);
-        } else if (distance < 5000) {
+        } else if (distance < 3000) {
+            spawnIntervalThreshold = Math.floor(200 + Math.random() * 400);
+        } else if (distance < 4000) {
             spawnIntervalThreshold = Math.floor(200 + Math.random() * 300);
+        } else if (distance < 5000) {
+            spawnIntervalThreshold = Math.floor(200 + Math.random() * 250);
         } else {
             spawnIntervalThreshold = Math.floor(150 + Math.random() * 300);
         }
